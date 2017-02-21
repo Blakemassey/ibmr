@@ -1,0 +1,30 @@
+Package: ibmr
+Type: Package
+Title: Inidividual-Based Modeling (IBM) Simulation Framework for R
+Description: A spatially-explicit individual-based modelling (IBM) simulation
+    framework designed for ecological systems.
+Version: 0.0.90000
+License: License: What license is it under?
+Authors@R: c(
+    person("Javan", "Bauder",, "jbauder@oriannesociety.org", c("aut")),
+    person("Blake", "Massey",, "blakemassey@gmail.com", c("aut", "cre"))
+    )
+Maintainer: Blake Massey <blakemassey@gmail.com>
+Encoding: UTF-8
+LazyData: true
+Imports:
+    circular,
+    ggplot2,
+    grid,
+    lubridate,
+    methods,
+    plot3D,
+    raster,
+    rasterVis,
+    sampling,
+    texmex,
+    VGAM
+RoxygenNote: 6.0.1
+Suggests: knitr,
+    rmarkdown
+VignetteBuilder: knitr
