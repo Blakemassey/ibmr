@@ -10,6 +10,7 @@ Authors@R: c(
     person("Blake", "Massey",, "blakemassey@gmail.com", c("aut", "cre"))
     )
 Maintainer: Blake Massey <blakemassey@gmail.com>
+URL: http://github.com/blakemassey/ibmr.R
 Encoding: UTF-8
 LazyData: true
 Imports:
