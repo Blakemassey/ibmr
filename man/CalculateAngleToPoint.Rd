@@ -24,6 +24,6 @@ point
 }
 \details{
 Coordinates must be in identically-scaled units (e.g. UTM meters).
-If location data is in lat & long, project coordinates to UTM with 'rgdal'
+If location data is in lat/long, project coordinates to UTM with 'rgdal'
 package before running this function.
 }

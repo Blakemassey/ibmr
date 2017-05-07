@@ -16,7 +16,6 @@
 #' @return numeric
 #' @export
 #'
-
 AngleToPoint <- function(origin_x,
                          origin_y,
                          target_x,
@@ -70,20 +69,19 @@ CenterXYInCell <- function(x,
 #' @export
 #'
 #' @details  Coordinates must be in identically-scaled units (e.g. UTM meters).
-#' If location data is in lat & long, project coordinates to UTM with 'rgdal'
+#' If location data is in lat/long, project coordinates to UTM with 'rgdal'
 #' package before running this function.
 #'
 CalculateAngleToPoint <- function(origin_long,
-                                   origin_lat,
-                                   target_long,
-                                   target_lat){
+                                  origin_lat,
+                                  target_long,
+                                  target_lat){
   dx <- c(target_long - origin_long)
   dy <- c(target_lat - origin_lat)
   abs_angle <- atan2(dy, dx)
   output <- ifelse(abs_angle < 0, (2*pi) + abs_angle, abs_angle)
   return(output)
 }
-
 
 #' ConvertAngle
 #'
@@ -97,7 +95,6 @@ CalculateAngleToPoint <- function(origin_long,
 #' @details Used so that the angles never go outside of the Unit Circle range
 #'   when angles are being added or subtracted from each other over and over
 #'   during a simulation.
-
 ConvertAngle <- function(x) {
   if (x > 2*pi) x <- x-(2*pi)
   if (x < 0) x <- x+(2*pi)
@@ -121,12 +118,67 @@ ConvertAngle <- function(x) {
 #' @details Coordinates must be in identically-scaled units (e.g. UTM meters).
 #' If location data is in lat & long, project coordinates to UTM with 'rgdal'
 #' package before running this function.
-
 CoordinatesFromAngleLength <- function (xy,
                                         angle,
                                         length){
   new_xy <- c(xy[1] + cos(angle) * length, xy[2] + sin(angle) * length)
   return(new_xy)
+}
+
+#' CreateConNestProb
+#'
+#' Create ConNest Probability Raster
+#'
+#' CreateConNestProb(con_nest_raster, gamma_shape, gamma_rate, x, y, max_r,
+#'   cellsize, base)
+#'
+#' @param con_nest_raster Raster,
+#' @param gamma_shape Numeric
+#' @param gamma_rate Numeric
+#' @param x Numeric,
+#' @param y Numeric,
+#' @param max_r Numeric,
+#' @param cellsize Numeric
+#' @param base Raster,
+#'
+#' @return Raster
+#' @export
+#'
+CreateConNestProb <- function(con_nest_raster,
+                              gamma_shape,
+                              gamma_rate,
+                              x,
+                              y,
+                              max_r,
+                              cellsize,
+                              base){
+  max_r_cells <- ceiling(max_r/cellsize)
+  xmin <- xmin(base)
+  ymin <- ymin(base)
+  xy <- CenterXYInCell(x, y, xmin, ymin, cellsize)  # May be unnecessary
+  cell_extent <- extent(xy[1]-(cellsize/2), xy[1]+(cellsize/2), xy[2]-
+    (cellsize/2), xy[2]+(cellsize/2))
+  cell <- setValues(raster(cell_extent, crs=projection(base), res=cellsize),1)
+  movement_kernel <- extend(cell, c(max_r_cells, max_r_cells), value=NA)
+  con_nest_crop <- crop(con_nest_raster, movement_kernel, snap='in')
+#plot(con_nest_crop, col=terrain.colors(255))
+  xy_pt <- data.frame(x = xy[1], y = xy[2])
+  xy_con_nest <- extract(con_nest_crop, xy_pt)
+  con_nest_adjust <- calc(con_nest_crop, fun=function(x){(x - xy_con_nest)/1000})
+#  plot(con_nest_adjust, col=terrain.colors(255))
+#  points(xy[1], xy[2], pch=20, col="blue")
+#  (extract(con_nest_adjust, xy_pt)) #should be zero
+  xy_log_scale <- NonlinearRangeRescaleGamma(x=(xy_con_nest/1000),
+    shape=gamma_shape, rate=gamma_rate,  min=NULL, max=NULL, lowBound=1,
+    upBound=NULL, movement_kernel=movement_kernel, negative=TRUE)
+#  curve(LogisticByInflection(x, inflection=0, scale=xy_log_scale), -15, 15)
+  LogisticByInflection2 <- function(x){
+    x <- LogisticByInflection(x, inflection=0, scale=xy_log_scale)
+  }
+  con_nest_rescale <- calc(con_nest_adjust, fun=LogisticByInflection2)
+#  plot(con_nest_rescale)
+#  points(xy[1], xy[2], pch=20, col="blue")
+  return(con_nest_rescale)
 }
 
 #' CreateParetoKernel
@@ -231,118 +283,76 @@ CreateRedistKernel <- function(max_r = 300,
   return(redist_kernel)
 }
 
-#' ExportKMLRasterOverlayWithTime
+#' CreateRedistKernelWeibull
 #'
-#' Export KML Raster function
+#' Create a redistribution kernel matrix based on a wrapped Cauchy distribution
+#'   for direction and a Weibull distribution for distance.
 #'
-#' @usage ExportKMLRasterOverlayWithTime(raster, time, color_pal, alpha,
-#'     maxpixels, blur, colNA, outfile, output_dir)
+#' @usage CreateRedistKernelWeibull(max_r, cellsize, mu, rho, shape, scale,
+#'    ignore_cauchy, ignore_weibull)
 #'
-#' @param raster a Raster* object
-#' @param time Interval* object, default = NULL
-#' @param color_pal color palette, can be a color ramp (e.g., c("white", "red")
-#'    or a specific palette (e.g., "SAGA_pal[[1]]")
-#' @param alpha numeric (0-1), transparency level of the .kml. Default is 1.
-#' @param method method used to compute values for the new RasterLayer. Either
-#'    'ngb' (nearest neighbor), which is useful for categorical variables, or
-#'    'bilinear' (bilinear interpolation; the default value), which is
-#'    appropriate for continuous variables.
-#' @param overwrite logical, overwrite output file
-#' @param maxpixels maximum number of pixels. If ncell(raster) > maxpixels,
-#'    sample is used to reduce the number of pixels.
-#' @param blur integer (default=10). Higher values help avoid blurring of
-#'    isolated pixels (at the expense of a png file that is blur^2 times
-#'    larger).
-#' @param colNA color to use for the background (default is transparent)
-#' @param outfile name of KML, default is to use name of raster
-#' @param output_dir output folder location, default is getwd()
-#' @param zip logical, whether or not to convert .kml to .kmz
+#' @param max_r maximum radius of kernel in meters, default = 300
+#' @param cellsize cell size in meters, default = 30
+#' @param mu mu parameter of wrapped Cauchy distribution, 0 radians is due east
+#'   because everything is based on the Unit Circle
+#' @param rho rho parameter of wrapped Cauchy distribution
+#' @param shape shape parameter of Pareto distribution
+#' @param scale scale parameter of Pareto distribution
+#' @param ignore_cauchy logical, removes cauchy kernel's contribution to output
+#'   raster. Default is FALSE.
+#' @param ignore_weibull logical, removes Weibull kernel's contribution to
+#'   output raster. Default is FALSE.
 #'
-#' @return KML of a Raster
+#' @return matrix
 #' @export
-#'
-#' @details Modified from functions in the 'kml' and 'raster' packages
-#'
-ExportKMLRasterOverlayWithTime <- function(raster = raster,
-                                           time = NULL,
-                                           color_pal = rev(terrain.colors(255)),
-                                           alpha = 1,
-                                           method = "ngb",
-                                           overwrite = TRUE,
-                                           maxpixels = 500000,
-                                           blur = 10,
-                                           colNA = "transparent",
-                                           outfile = NULL,
-                                           output_dir= getwd(),
-                                           zip = TRUE) {
-  suppressPackageStartupMessages(require(raster))
-  x <- raster
-  if (nlayers(x) > 1) {
-    x <- x[[1]]
-  }
-  if(!is.null(outfile)){
-    name <- outfile
-    outfile <- paste(output_dir, "/", name, ".kml", sep="")
-  } else {
-    name <- names(x)
-    if (name == "layer") {
-      name <- deparse(substitute(raster))
-    }
-    outfile <- paste(output_dir, "/", name, ".kml", sep="")
-  }
-  stopifnot(hasValues(x))
-  x <- projectRaster(x, crs="+proj=longlat +datum=WGS84", method=method)
-  unique_x <- length(unique(getValues(x)))
-  col <- colorRampPalette(color_pal, alpha=TRUE)(unique_x)
-  cols <- adjustcolor(col, alpha)
-  #  if (unique_x > 250) unique_x <- 250
-  filename <- extension(outfile, ".kml")
-  x <- sampleRegular(x, size=maxpixels, asRaster=TRUE, useGDAL=TRUE)
-  imagefile <- filename
-  extension(imagefile) <- ".png"
-  kmlfile <- kmzfile <- filename
-  extension(kmlfile) <- ".kml"
-  if (file.exists(kmlfile)) {
-    if (overwrite) {
-      file.remove(kmlfile)
-    } else {
-      stop("kml file exists, use \"overwrite=TRUE\" to overwrite it")
-    }
-  }
-  png(filename=imagefile, width=max(480, blur * ncol(x)), height=max(480,
-    blur * nrow(x)), bg="transparent", type="cairo-png")
-  if (!is.na(colNA)) {
-    par(mar = c(0, 0, 0, 0), bg = colNA)
-  } else {
-    par(mar = c(0, 0, 0, 0))
-  }
-  x[x== 0] <- NA
-  image(x, col=cols, axes=FALSE, useRaster=TRUE, maxpixels=maxpixels)
-  #plot(x, colNA="transparent")
-  dev.off()
-  kml <- c("<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-    "<kml xmlns=\"http://www.opengis.net/kml/2.2\">", "<GroundOverlay>")
-  kmlname <- paste("<name>", name, "</name>", sep="")
-  if(!is.null(time)){
-    start_time <- paste0(strftime(int_start(time), "%Y-%m-%d", tz = time@tzone),
-      "T", strftime(int_start(time), "%H:%M", tz=time@tzone), "Z")
-    end_time <- paste0(strftime(int_end(time), "%Y-%m-%d", tz = time@tzone),
-      "T", strftime(int_end(time), "%H:%M", tz=time@tzone), "Z")
-    timespan <- paste0("<TimeSpan>", "<begin>", start_time, "</begin>", "<end>",
-      end_time, "</end>", "</TimeSpan>")
-  } else {
-    timespan <- ""
-  }
-  icon <- paste("<Icon><href>", basename(imagefile),"</href><viewBoundScale>",
-    "0.75</viewBoundScale></Icon>", sep="")
-  e <- extent(x)
-  latlonbox <- c("\t<LatLonBox>", paste("\t\t<north>", e@ymax,"</north><south>",
-    e@ymin, "</south><east>", e@xmax, "</east><west>", e@xmin, "</west>",
-    sep = ""), "\t</LatLonBox>")
-  footer <- "</GroundOverlay></kml>"
-  kml <- c(kml, kmlname, timespan, icon, latlonbox, footer)
-  cat(paste(kml, sep = "", collapse = "\n"), file = kmlfile, sep = "")
-  if(zip) ZipKML(kmlfile, imagefile)
+CreateRedistKernelWeibull <- function(max_r = 300,
+                                      cellsize = 30,
+                                      mu,
+                                      rho,
+                                      shape,
+                                      scale,
+                                      ignore_cauchy = FALSE,
+                                      ignore_weibull = FALSE) {
+  if (is.null(max_r)) max_r <- qweibull(.99, shape, scale) * 1000
+  max_r_cells <- ceiling(max_r/cellsize)
+  size <- max_r_cells * 2 + 1
+  center <- max_r_cells + 1
+  angle_matrix <- new("matrix", 0, size, size)
+  row_matrix <- new("matrix", 0, size, size)
+  col_matrix <- new("matrix", 0, size, size)
+  distance_matrix <- new("matrix", 0, size, size)
+  weibull_kernel <- new("matrix", 0, size, size)
+  i <- j <-  1:size
+  row_matrix[] <- rep(i, times  = max(j))
+  col_matrix <- t(row_matrix)
+  dx <- row_matrix - center
+  dy <- col_matrix - center
+  abs_angle <- atan2(dx, dy)
+  angle_matrix <- ifelse(abs_angle < 0, (2*pi) + abs_angle, abs_angle)
+  wrpc_kernel <- suppressWarnings(circular::dwrappedcauchy(angle_matrix,
+    mu=mu, rho=rho))
+  wrpc_kernel <- apply(wrpc_kernel, 2, rev)
+  distance_matrix <- (sqrt((row_matrix - center)^2 + (col_matrix - center)^2) *
+      cellsize) / 1000
+  weibull_kernel[] <- dweibull(as.vector(distance_matrix), shape=shape,
+    scale=scale)
+  weibull_kernel[center, center] <- 0  # Forces agent to move from current cell
+  # This last part deletes the cells at the edge if they are all zero
+  if (all(wrpc_kernel[1, ] == 0, wrpc_kernel[, 1] == 0,
+    wrpc_kernel[nrow(wrpc_kernel),] == 0, wrpc_kernel[, ncol(wrpc_kernel)] ==0))
+    wrpc_kernel <- wrpc_kernel[2:(nrow(wrpc_kernel) - 1), 2:(ncol(wrpc_kernel)
+      - 1)]
+  if (all(weibull_kernel[1, ] == 0, weibull_kernel[, 1] == 0,
+    weibull_kernel[nrow(weibull_kernel),] == 0, weibull_kernel[,
+      ncol(weibull_kernel)] == 0))
+    weibull_kernel <- weibull_kernel[2:(nrow(weibull_kernel) - 1),
+      2:(ncol(weibull_kernel) - 1)]
+  # Multiply the two kernels together and re-normalize
+  if (ignore_cauchy) wrpc_kernel <- 1
+  if (ignore_weibull) weibull_kernel <- 1
+  redist_kernel <- weibull_kernel*wrpc_kernel
+  redist_kernel <- redist_kernel/sum(redist_kernel)
+  return(redist_kernel)
 }
 
 
@@ -358,6 +368,7 @@ ExportKMLRasterOverlayWithTime <- function(raster = raster,
 #' @param step_data 'step_data' dataframe
 #' @param step step interval
 #'
+#'
 #' @return 'step_data' object
 #' @export
 #'
@@ -367,19 +378,29 @@ MovementSubModel <- function(sim = sim,
                              step = step) {
   sim <- sim
   base <- sim$spatial$base
-  cellsize <- res(sim$spatial$base)[1]
-  step_start <- int_start(step)
-  step_end <- int_end(step)
+  cellsize <- raster::res(sim$spatial$base)[1]
+  step_start <- lubridate::int_start(step)
+  step_end <- lubridate::int_end(step)
   sex <- agent_states$sex
   season <- FindSeasonFromDatetime(datetime = step_start,
     seasons = sim$pars$global$sim_seasons)
-  home_return <- sim$pars$classes[[sex]]$julian[yday(int_start(step)),
-    "home_return"]
+  home_return <-
+    sim$pars$classes[[sex]]$julian[lubridate::yday(lubridate::int_start(step)),
+    2]
   step_max_r <- sim$pars$classes[[sex]]$season[[season]]$step_max_r
   step_cauchy_mu <- sim$pars$classes[[sex]]$constant$fixed$step_cauchy_mu
   step_cauchy_rho <- sim$pars$classes[[sex]]$constant$fixed$step_cauchy_rho
-  step_pareto_shape <-sim$pars$classes[[sex]]$season[[season]]$step_pareto_shape
-  step_pareto_scale <-sim$pars$classes[[sex]]$season[[season]]$step_pareto_scale
+  step_weibull_shape <-
+    sim$pars$classes[[sex]]$season[[season]]$step_weibull_shape
+  step_weibull_scale <-
+    sim$pars$classes[[sex]]$season[[season]]$step_weibull_scale
+
+  connest_gamma_shape <-
+    sim$pars$classes[[sex]]$constant$fixed$nestcon_gamma_shape
+  connest_gamma_rate <-
+    sim$pars$classes[[sex]]$constant$fixed$nestcon_gamma_rate
+
+  con_nest_raster <- sim$spatial$con_nest_raster[[agent_states$nest_id]]
 
 #  homerange_kernel <- sim$spatial$homerange_kernel[[agent_states$nest_id]]
 #  landcover <- sim$spatial$landcover
@@ -387,15 +408,16 @@ MovementSubModel <- function(sim = sim,
 
   if (nrow(step_data) == 1) {
     i <- 1
-    step_data[i+1, "datetime"] <- int_end(step)
+    step_data[i+1, "datetime"] <- lubridate::int_end(step)
     step_data[1, "exp_angle"] <- sample(x=seq(from=0, to=(2*pi), by=(2*pi/360)),
       size=1)
     go_home <- FALSE
   } else {
     i <- nrow(step_data)
-    step_data[i+1, "datetime"] <- int_end(step)
+    step_data[i+1, "datetime"] <- lubridate::int_end(step)
     step_data$exp_angle[i] <- step_data$abs_angle[i-1]
-    go_home <- rbinom(1, 1, home_return)
+  #  go_home <- rbinom(1, 1, home_return)
+    go_home <- FALSE
   }
   if (go_home == TRUE) {
     home_xy <- c(agent_states$start_x, agent_states$start_y)
@@ -406,27 +428,41 @@ MovementSubModel <- function(sim = sim,
     step_data$step_length[i] <- as.integer(sqrt((step_data[i, "x"] -
       step_data[i+1, "x"])^2 + (step_data[i, "y"]-step_data[i+1, "y"])^2))
   } else {
-    redist <- CreateRedistKernel(max_r=step_max_r, cellsize=cellsize,
-      mu=step_data$exp_angle[i], rho=step_cauchy_rho, shape=step_pareto_shape,
-      scale=step_pareto_scale)
+    redist <- CreateRedistKernelWeibull(max_r=step_max_r, cellsize=cellsize,
+      mu=step_data$exp_angle[i], rho=step_cauchy_rho, shape=step_weibull_shape,
+      scale=step_weibull_scale)
     r <- (cellsize*((nrow(redist)-1)/2))+(cellsize/2)
-    redist_raster <- raster(redist, xmn=-r, xmx=r, ymn=-r, ymx=r)
-    redist_shift <- shift(redist_raster, x=step_data$x[i], y=step_data$y[i])
-
+    redist_raster <- raster::raster(redist, xmn=-r, xmx=r, ymn=-r, ymx=r)
+    redist_shift <- raster::shift(redist_raster, x=step_data$x[i],
+      y=step_data$y[i])
     ### PLACE TO ADD IN OTHER PROBABILITY LAYERS
-    redist_shift <- crop(redist_shift, base, snap="in")
 
+    print(paste("x:", step_data$x[i], " y:", step_data$y[i]))
+
+    redist_shift <- raster::crop(redist_shift, base, snap="in")
+    ### NEW ConNestProb Raster
+    con_nest <- CreateConNestProb(con_nest_raster,
+      gamma_shape=connest_gamma_shape, gamma_rate=connest_gamma_rate,
+      x=step_data$x[i], y=step_data$y[i], max_r=step_max_r, cellsize=cellsize,
+      base=base)
+    print(paste0("con_nest:", as.vector(raster::extent(con_nest)),
+      "redist_shift:", as.vector(raster::extent(redist_shift))))
+    con_nest_crop <- raster::crop(con_nest, redist_shift, snap="out")
 #    landcover_crop <- crop(landcover, redist_shift, snap="out")
 #    hydro_dist_crop <- crop(hydro_dist, redist_shift, snap="out")
 #    homerange_crop <- crop(homerange_kernel, redist_shift, snap="out")
 #    prob_raster <- overlay(redist_shift, landcover_crop, hydro_dist_crop,
 #      homerange_crop, fun=function(a,b,c,d) {return(a*b*c*d)}, recycle=FALSE)
 #    prob_raster <- prob_raster/cellStats(prob_raster, stat="sum")
+#    prob_raster <- redist_shift
+#    prob_raster <- prob_raster/cellStats(prob_raster, stat="sum")
+    prob_raster <- raster::overlay(redist_shift, con_nest_crop,
+      fun=function(a,b){return(a*b)}, recycle=FALSE)
+    prob_raster <- prob_raster/raster::cellStats(prob_raster, stat="sum")
+    print("prob_min:", raster::minValue(prob_raster))
+  #  prob_raster[prob_raster <= .000001] <- 0
 
-    prob_raster <- redist_shift
-    prob_raster <- prob_raster/cellStats(prob_raster, stat="sum")
-
-    crs(prob_raster) <- crs(sim$spatial$base)
+    raster::crs(prob_raster) <- raster::crs(sim$spatial$base)
 #    ExportKMLRasterOverlayWithTime(raster = prob_raster, time = step,
 #      alpha = .8, color_pal= jet2.col(20),
 #      outfile = paste0(agent_states$id, "_", i),
@@ -434,10 +470,24 @@ MovementSubModel <- function(sim = sim,
 
     ### END OF OTHER PROBABILITY LAYERS
 
+#    plot(prob_raster)
+
     destination_cell <- suppressWarnings(sampling::strata(data=data.frame(cell=
       1:ncell(prob_raster)), stratanames=NULL, size=1, method="systematic",
       pik=prob_raster@data@values))
-    destination_xy <- xyFromCell(prob_raster, destination_cell[1,1])
+
+    while(is.na(destination_cell[1,1])) {
+      destination_cell <- suppressWarnings(sampling::strata(data=data.frame(
+        cell=1:ncell(prob_raster)), stratanames=NULL, size=1,
+        method="systematic", pik=prob_raster@data@values))
+    }
+
+    print(paste("destination_cell:", destination_cell[1,1]))
+
+    destination_xy <- raster::xyFromCell(prob_raster, destination_cell[1,1])
+
+    print(paste("x:", destination_xy[1], " y:", destination_xy[2]))
+
     step_data[i+1, "x"] <- destination_xy[1]
     step_data[i+1, "y"] <- destination_xy[2]
     step_data$abs_angle[i] <- CalculateAngleToPoint(step_data$x[i],
@@ -449,40 +499,51 @@ MovementSubModel <- function(sim = sim,
   return(step_data)
 }
 
-
-#' ZipKML
+#' NonlinearRangeRescaleGamma
 #'
-#' Zip a kml file
+#' Non-linear Range Rescale Gamma Distribution
 #'
-#' @usage ZipKML(kml, image)
+#' @param x numeric
+#' @param shape numeric
+#' @param rate numeric
+#' @param min numeric
+#' @param max numeric
+#' @param lowBound numeric
+#' @param upBound numeric
+#' @param movement_kernel kernel
+#' @param negative logical
 #'
-#' @param kml filename for RasterStack or RasterBrick
-#' @param image filename for image file
-#'
-#' @return a .zip file
+#' @return vector
 #' @export
 #'
-#' @details Based on function from 'raster' package
-#'
-ZipKML <- function(kml,
-                   image) {
-	wd <- getwd()
-	on.exit(setwd(wd))
- 	setwd(dirname(kml))
-	kml <- basename(kml)
-	kmz <- extension(kml, '.kmz')
-	image <- basename(image)
-	if (file.exists(kmz)) {
-		x <- file.remove(kmz)
-	}
-	kmzzip <- extension(kmz, '.zip')
-	cmd <- paste('7z', 'a', kmzzip, kml, image, collapse=" ")
-  sss <- try(system(cmd, intern=TRUE), silent=TRUE)
-  file.rename(kmzzip, kmz)
-  if (file.exists(kmz)) {
-		file.remove(kml, image)
-		return(invisible(kmz))
-	} else {
-		return(invisible(kml))
-	}
+NonlinearRangeRescaleGamma <- function(x,
+                                       shape = shape,
+                                       rate = rate,
+                                       min = NULL, #e.g., .001; pgamma
+                                       max = NULL, #e.g., .99; pgamma
+                                       lowBound = 1,
+                                       upBound = NULL,
+                                       movement_kernel = movement_kernel,
+                                       negative = TRUE){
+  if(is.null(min)){
+    max_distance <- qgamma(0.999, shape=shape, rate=rate)
+    min <- pgamma(max_distance, shape=shape, rate=rate, lower.tail=FALSE)
+  }
+  if(is.null(max)){
+    max <- pgamma(.075, shape=shape, rate=rate, lower.tail=FALSE)
+  }
+  if(is.null(upBound)){
+    upBound <- sqrt((xmin(movement_kernel)-xmax(movement_kernel))^2+
+                      (ymin(movement_kernel)-ymax(movement_kernel))^2)/1000
+  }
+  # Get predicted y (cummulative gamma) for x
+  y_pred <- pgamma(x, shape=shape, rate=rate, lower.tail=FALSE)
+  rescale <- lowBound + (((y_pred-min)/(max-min)) * (upBound-lowBound))
+  if(negative==TRUE){
+    rescale <- rescale*-1
+  }
+  return(rescale)
 }
+
+
+

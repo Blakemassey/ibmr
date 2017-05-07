@@ -45,7 +45,6 @@ CreateHomeRangeKernels <- function(df_all,
                                    output_dir,
                                    write_distance = FALSE,
                                    write_homerange = FALSE) {
-  source('C:/Work/R/Functions/sim/move.R')
   cellsize <- res(base)[1]
   max_r_cells <- ceiling(max_r/cellsize)
   xmin <- xmin(base)
@@ -198,6 +197,105 @@ PlotSimHomeRange <- function (sim,
       limits=ext[c(3,4)])
   }
   return(g)
+}
+
+#' SampleRandomPointsInHomerange
+#'
+#' Creates RasterLayers of homerange kernels based on home centroids
+#'
+#' @usage SampleRandomPointsInHomerange (df_all, df_home, used_pts, base,
+#'   max_r, id, name, output_dir)
+#'
+#' @param df_all dataframe of all homerange centroids
+#' @param df_home dataframe of homerange centroids to calculate homerange
+#'   kernels (these must be a subset of the df_all dataframe), Default is to
+#'   use 'df_all' dataframe
+#' @param used_pts dataframe of points to use for analysis
+#' @param base Raster that sets the projection, extent, and dimensions of the
+#'   study area
+#' @param max_r  maximum radius to calculate the homerange raster from each
+#'   df_home centroid
+#' @param id column name of df_home that identifies the homerange. Default is
+#'   NULL, which sets the names to df_home row number.
+#' @param name column name of df_home that identifies the name of the homerange
+#'   and is used to write the file name of the .tif.Default is 'id', which sets
+#'   the names to df_home row number if 'id' is NULL.
+#' @param output_dir directory for output files (, homerange)
+#' @param write_homerange logical, write home range raster to file. Default is
+#'   FALSE.
+#'
+#' @return A list containing homerange kernel Rasters for all the df_home
+#'   centroids.
+#' @export
+#'
+#' @details A list containing homerange kernel Rasters for all the df_home
+#'   centroids.
+#'
+SampleRandomPointsInHomerange <- function(df_all,
+                                          df_home = df_all,
+                                          used_pts = baea,
+                                          base,
+                                          max_r,
+                                          id = NULL,
+                                          name = id,
+                                          output_dir,
+                                          write_homerange = FALSE) {
+  cellsize <- res(base)[1]
+  max_r_cells <- ceiling(max_r/cellsize)
+  xmin <- xmin(base)
+  ymin <- ymin(base)
+  df_all_sp <- SpatialPointsDataFrame(df_all[,c("long_utm","lat_utm")], df_all,
+    proj4string=crs(base))
+  homerange_ids <- df_home[,id]
+  total <- length(homerange_ids)
+  output <- data.frame()
+  for (j in 1:nrow(df_home)) {
+    home <- df_home[j,]
+    used_pts_j <- used_pts %>% dplyr::filter(nest_site == home$nest_site)
+    used_pts_j_sp <- SpatialPoints(used_pts_j[c("long_utm", "lat_utm")],
+      crs(base))
+    ifelse(is.null(name), home_name <- j, home_name <- home[,name])
+    writeLines(noquote(paste0("Calculating random points for: ", home_name,
+      " (", j, " of ", total, ").")))
+    home_sp <- SpatialPointsDataFrame(home[,c("long_utm","lat_utm")], home,
+      proj4string=crs(base))
+    xy <- CenterXYInCell(home_sp@coords[,"long_utm"],
+      home_sp@coords[,"lat_utm"], xmin, ymin, cellsize)
+    cell_extent <- extent(xy[1]-(cellsize/2), xy[1]+(cellsize/2), xy[2]-
+      (cellsize/2), xy[2]+(cellsize/2))
+    cell <- setValues(raster(cell_extent, crs=projection(base), res=cellsize),j)
+    home_ext <- raster::extend(cell, c(max_r_cells, max_r_cells), value=NA)
+    home_dist <- raster::distanceFromPoints(home_ext, home[,c("long_utm",
+      "lat_utm")])
+    base_crop <- raster::crop(base, extent(home_ext))
+    global_dist_crop <- raster::distanceFromPoints(base_crop, df_all_sp)
+    cent_dist <- raster::overlay(home_dist, global_dist_crop, fun=function (x,y)
+      {ifelse(x != y, NA, x)})
+    homerange <- raster::calc(cent_dist, fun = function(x){ifelse(x>0, 1, NA)})
+    if (write_homerange == TRUE) {
+      filename <- file.path(output_dir, paste0("HomeRange_", home_name,
+        ".tif"))
+      writeRaster(homerange, filename=filename, format="GTiff",
+        overwrite=TRUE)
+      writeLines(noquote(paste("Writing:", filename)))
+    }
+    used_pts_j$inside <- raster::extract(homerange, SpatialPoints(used_pts_j[
+      c("long_utm", "lat_utm")], crs(base)))
+    used_pts_inside <- used_pts_j %>%
+      filter(inside == 1) %>%
+      mutate(x = long_utm) %>%
+      mutate(y = lat_utm) %>%
+      mutate(point = 1) %>%
+      dplyr::select(id, x, y, point)
+    random_pts <- as.data.frame(randomPoints(homerange,
+      n=nrow(used_pts_inside)))
+    colnames(random_pts) <- c("x", "y")
+    random_pts$point <- 0
+    random_pts$id <- unique(used_pts_j$id)
+    random_pts <- random_pts %>% dplyr::select(id, x, y, point)
+    output <- rbind(output, used_pts_inside, random_pts)
+  }
+  return(output)
 }
 
 #' SimulateHomeRange

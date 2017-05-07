@@ -15,6 +15,7 @@ Encoding: UTF-8
 LazyData: true
 Imports:
     circular,
+    dismo,
     ggplot2,
     grid,
     lubridate,
@@ -24,7 +25,8 @@ Imports:
     rasterVis,
     sampling,
     texmex,
-    VGAM
+    VGAM,
+    zoo
 RoxygenNote: 6.0.1
 Suggests: knitr,
     rmarkdown

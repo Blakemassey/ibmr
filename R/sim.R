@@ -71,8 +71,7 @@ CalculateCurrentAge <- function(datetime,
 #'
 CalculateReportAge <- function(agent_states,
                                step_data) {
-  suppressPackageStartupMessages(require(zoo))
-  birth_date <- ymd(agent_states$birth_date)
+  birth_date <- lubridate::ymd(agent_states$birth_date)
   datetime <- step_data[nrow(step_data), "datetime"]
   age_period <- sim$pars$global$report_age_period
   if (age_period == "day" || age_period == "days") {
@@ -82,10 +81,10 @@ CalculateReportAge <- function(agent_states,
     age <- floor(as.numeric(difftime(datetime, birth_date, units="weeks")))
   }
   if (age_period == "month" || age_period == "months") {
-    age <- floor((as.yearmon(datetime) - as.yearmon(birth_date))*12)
+    age <- floor((zoo::as.yearmon(datetime) - zoo::as.yearmon(birth_date))*12)
   }
   if (age_period == "year" || age_period == "years") {
-    age <- floor(as.yearmon(datetime) - as.yearmon(birth_date))
+    age <- floor(zoo::as.yearmon(datetime) - zoo::as.yearmon(birth_date))
   }
   return(age)
 }
@@ -109,41 +108,13 @@ CompileAllAgentsStepData <- function(sim = sim) {
   all <- sim$agents$all
   for (i in 1:length(all)) {
     if (exists("step_data", where=sim$agents$all[[i]])){
-      all_step_data <- rbind(all_step_data, sim$agents$all[[i]]$step_data)
+      step_data_i <- sim$agents$all[[i]]$step_data
+      step_data_i$sex <- sim$agents$all[[i]]$states$sex
+      all_step_data <- rbind(all_step_data, step_data_i)
     }
   }
   return(all_step_data)
 }
-
-#' ConvertStepDataCoordinates
-#'
-#' Converts "x", "y" columns to coordinates to lat/long WGS84 (for Google)
-#'
-#' @usage ConvertStepDataCoordinates(df)
-#'
-#' @param df input dataframe with "x", "y" columns
-#' @param crs string of projection for "x", "y" columns, default is for
-#'   Maine BAEA GPS data (UTM Zone 19N).
-#'
-#' @return A dataframe with added "long", "lat" columns
-#' @export
-#'
-
-ConvertStepDataCoordinates <- function(df,
-                                       crs = "+proj=utm +zone=19 ellps=WGS84"){
-  suppressPackageStartupMessages(library(rgdal))
-  suppressPackageStartupMessages(library(sp))
-  df <- df
-  coordinates(df) <- c("x", "y")
-  proj4string(df) <- CRS(crs)
-  res <- spTransform(df, CRS("+proj=longlat +datum=WGS84"))
-  long_lat <- coordinates(res)
-  colnames(long_lat) <- c("long", "lat")
-  output <- cbind.data.frame(df, long_lat)
-  output$optional <- NULL
-  return(output)
-}
-
 
 #' CreateAgentsInputClass
 #'
@@ -434,7 +405,6 @@ CreateRunsList <- function(runs = runs) {
 #' 2nd. Date format: "10Feb" or "02Oct" is preferred.
 
 CreateReportIntervals <- function(sim = sim) {
-  suppressPackageStartupMessages(require(lubridate))
   sim_start <- sim$pars$global$sim_start
   sim_period <- sim$pars$global$sim_period
   sim_end <- sim$pars$global$sim_end
@@ -531,28 +501,29 @@ CreateReportIntervals <- function(sim = sim) {
 #' period. The step_period should be of equal or greater length than the
 #' time_step_period.
 #'
+#'
 #' @return a list of intervals
 #' @export
 #'
 CreateStepIntervals <- function(rep_interval = rep_interval,
                                 step_period = sim$pars$global$step_period) {
-  suppressPackageStartupMessages(require(lubridate))
   step_period <- step_period
   step_intervals <- list()
   interval_counter <- 1
-  current_start <- int_start(rep_interval)
+  current_start <- lubridate::int_start(rep_interval)
   current_end <- (current_start + step_period)
-  stop_point <- int_end(rep_interval)
+  stop_point <- lubridate::int_end(rep_interval)
   while(current_start < (stop_point)) {
     current_end <- (current_start+step_period)
-    step_intervals[[interval_counter]] <- interval(current_start,
+    step_intervals[[interval_counter]] <- lubridate::interval(current_start,
       current_end)
     interval_counter <- interval_counter + 1
     current_start <- current_start + step_period
     }
-  if (int_end(step_intervals[[length(step_intervals)]]) > stop_point) {
+  if (lubridate::int_end(step_intervals[[length(step_intervals)]])>stop_point){
     step_intervals[[length(step_intervals)]] <-
-      interval(int_start(step_intervals[[length(step_intervals)]]), stop_point)
+      interval(lubridate::int_start(step_intervals[[length(step_intervals)]]),
+        stop_point)
     }
   return(step_intervals)
 }
@@ -570,6 +541,7 @@ CreateStepIntervals <- function(rep_interval = rep_interval,
 #' the time_step_period the function will return a POSIXct object with the same
 #' date as the end of the current_step_interval.
 #'
+#'
 #' @return a list of intervals
 #' @export
 #'
@@ -577,20 +549,23 @@ CreateTimeSteps <- function(step_interval = step_interval,
                             time_step_period =
                               sim$pars$global$time_step_period) {
   options(lubridate.verbose=FALSE)
-  step_interval_end <- int_end(step_interval)
-  steps <- int_start(step_interval) # creates output list object w/start time
-  end_int <- int_end(as.interval(time_step_period, int_start(step_interval)))
-  steps <- with_tz(append(steps, end_int), tz(int_end(step_interval))) # 2nd t
+  step_interval_end <- lubridate::int_end(step_interval)
+  steps <- lubridate::int_start(step_interval) # create output list w/start time
+  end_int <- lubridate::int_end(lubridate::as.interval(time_step_period,
+    lubridate::int_start(step_interval)))
+  steps <- lubridate::with_tz(append(steps, end_int),
+    lubridate::tz(lubridate::int_end(step_interval)))
   while (end_int < step_interval_end) {
     end_int <- end_int + time_step_period
-    steps <- with_tz(append(steps, end_int), tz(int_end(step_interval)))
+    steps <- lubridate::with_tz(append(steps, end_int),
+      lubridate::tz(lubridate::int_end(step_interval)))
   }
   if (tail(steps, 1) > step_interval_end) {
     steps[length(steps)] <- step_interval_end
   }
   time_step_list <- list()
   for (i in 1:(length(steps)-1)) {
-    interval <- as.interval(steps[i], steps[i+1])
+    interval <- lubridate::as.interval(steps[i], steps[i+1])
     time_step_list[[length(time_step_list)+1]] <- interval
   }
   return(time_step_list)
@@ -677,12 +652,13 @@ ExtractUnitFromPeriod <- function(period) {
 #'   format %B%d, %b%d, %d%B, or %B%d (see ?strptime for more details on
 #'   formatting). Example: c("April01", "May15", "Sep1", "Oct15"). Required.
 #'
+#' @import lubridate
+#'
 #' @return an Interval object
 #' @export
 
 FindFirstReportInterval <- function(sim_start,
                                     rep_interval){
-  require(lubridate)
   start_year <- as.Date(0, origin=as.Date(floor_date(sim_start, "year")))
   if (length(rep_interval) == 1) {
     first_int <- as.interval(period(1, "year"), dmy(paste0(rep_interval[1],
@@ -752,13 +728,14 @@ FindFirstReportInterval <- function(sim_start,
 #' @param seasons = a dataframe of starting dates ("start" column) and season
 #' names ("season" column), usually located at: sim$pars$global$sim_seasons
 #'
+#' @import lubridate
+#'
 #' @return  an atomic character object
 #' @export
 #'
 #'
 FindSeasonFromDatetime <- function(datetime = datetime,
                                    seasons = sim$pars$global$sim_seasons) {
-  require(lubridate)
   start_year <- as.Date(0, origin=as.Date(floor_date(datetime, "year")))
   if (max(names(guess_formats(seasons[, "start"], c("md", "dm")))) == "md") {
     md_format <- max(guess_formats(seasons[, "start"], c("md", "dm")))
@@ -814,24 +791,6 @@ NamedList <- function(...) {
     setNames(list, name)
 }
 
-#' RemoveExcept
-#'
-#' Helper function that removes all the objects in the environment except ones
-#' listed in argument
-#'
-#' @usage RemoveExcept(object)
-#'
-#' @param object = objects to keep
-#'
-#' @return  environment with only the kept objects
-#' @export
-#'
-RemoveExcept <- function(object = object){
-  if (length(setdiff(ls(pos = .GlobalEnv), object)) > 0) {
-    rm(list=setdiff(ls(pos = .GlobalEnv), object), pos = .GlobalEnv)
-  }
-}
-
 #' ReproductionSubModel
 #'
 #' Reproduction submodel
@@ -846,12 +805,13 @@ RemoveExcept <- function(object = object){
 #'
 ReproductionSubModel <- function(agent_states = agent_states,
                                  step_data = step_data) {
+  dummy = TRUE
   if(dummy){
-
+    agent_states = agent_states
   } else {
 
-
   }
+  return(agent_states)
 }
 
 #' ReturnActiveSeq
@@ -1262,14 +1222,4 @@ WriteSimList <- function(write = TRUE,
       save(sim, file = file_path)
     }
   }
-}
-
-#' TestMe
-#' This is to test the order things load
-#'
-#' @return print statement
-#' @export
-
-TestMe <- function(){
-  print("Testing from sim.R. Double-check")
 }

@@ -5,11 +5,10 @@
 \alias{ibmr}
 \alias{ibmr-package}
 \title{ibmr: An individual-based model (IBM) framework for conducting
-  spatially-explicit simulation. This package has the basic structure to run
-  an IBM, but will need to modified by the user in order to make a useful
-  model.}
+  spatially-explicit simulation.}
 \description{
-Still in DEVELOPMENT phase!
+This package has the basic structure to run an IBM, but will need to modified
+by the user in order to make a useful model. Still in DEVELOPMENT phase.
 }
 \section{List of 'sim' Components}{
 

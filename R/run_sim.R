@@ -32,6 +32,8 @@ RunSimulation <- function(sim = sim,
           alive_seq <- ReturnAliveSeq(sim)
           sim$agents$all <- UpdateAgentParsData(sim$agents$all)
           for (n in alive_seq) {
+            print(paste("alive_seq:", n))
+
             agent_states <- sim$agents$all[[n]][["states"]]
             step_data <- sim$agents$all[[n]][["step_data"]]
             pars_data <- sim$agents$all[[n]][["pars_data"]]
@@ -60,15 +62,3 @@ RunSimulation <- function(sim = sim,
   }
   return(runs)
 }
-
-#' TestMe
-#' This is to test the order things load
-#'
-#' @return print statement
-#' @export
-
-TestMe <- function(){
-  print("Testing from run_sim.R")
-}
-
-
