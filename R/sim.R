@@ -672,14 +672,14 @@ FindFirstReportInterval <- function(sim_start,
     }
   }
   if (length(rep_interval) == 2) {
-    first_int <- as.interval(dmy(paste0("0101", year(start_year))),
+    first_int <- interval(dmy(paste0("0101", year(start_year))),
       dmy(paste0(rep_interval[1], year(start_year))))
     if ((sim_start + period(1, "second")) %within% first_int) {
       first_rep_int <- interval(sim_start, dmy(paste0(rep_interval[1],
         year(start_year))))
     }
     if (exists("first_rep_int") == FALSE) {
-      second_int <- as.interval(dmy(paste0(rep_interval[1], year(start_year))),
+      second_int <- interval(dmy(paste0(rep_interval[1], year(start_year))),
         dmy(paste0(rep_interval[2], year(start_year))))
       if ((sim_start + period(1, "second")) %within% second_int) {
         first_rep_int <- interval(sim_start, dmy(paste0(rep_interval[2],
@@ -691,14 +691,14 @@ FindFirstReportInterval <- function(sim_start,
     }
   }
   if (length(rep_interval) > 2) {
-    first_int <- as.interval(dmy(paste0("0101", year(start_year))),
+    first_int <- interval(dmy(paste0("0101", year(start_year))),
         dmy(paste0(rep_interval[1], year(start_year))))
     if ((sim_start + period(1, "second")) %within% first_int) {
       first_rep_int <- interval(sim_start, dmy(paste0(rep_interval[1],
         year(start_year))))
     }
     for (i in 2:(length(rep_interval)-1)) {
-      mid_int <- as.interval(dmy(paste0(rep_interval[i], year(start_year))),
+      mid_int <- interval(dmy(paste0(rep_interval[i], year(start_year))),
         dmy(paste0(rep_interval[i+1], year(start_year))))
       if ((sim_start + period(1, "second")) %within% mid_int) {
         first_rep_int <- interval(sim_start, dmy(paste0(rep_interval[i+1],
@@ -706,7 +706,7 @@ FindFirstReportInterval <- function(sim_start,
       }
     }
     for (i in length(rep_interval)) {
-      last_int <- as.interval(dmy(paste0(rep_interval[i], year(start_year))),
+      last_int <- interval(dmy(paste0(rep_interval[i], year(start_year))),
         dmy(paste0("0101", (year(start_year)+1) )))
       if ((sim_start + period(1, "second")) %within% last_int) {
         first_rep_int <- interval(sim_start, dmy(paste0(rep_interval[1],

@@ -34,3 +34,6 @@ matrix
 Create a redistribution kernel matrix based on a wrapped Cauchy distribution
   for direction and a Weibull distribution for distance.
 }
+\details{
+the Weibull parameters need to be based on distance in meters
+}

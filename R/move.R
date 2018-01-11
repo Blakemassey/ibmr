@@ -304,7 +304,10 @@ CreateRedistKernel <- function(max_r = 300,
 #'   output raster. Default is FALSE.
 #'
 #' @return matrix
+#' @details the Weibull parameters need to be based on distance in meters
+#'
 #' @export
+#'
 CreateRedistKernelWeibull <- function(max_r = 300,
                                       cellsize = 30,
                                       mu,
@@ -313,18 +316,15 @@ CreateRedistKernelWeibull <- function(max_r = 300,
                                       scale,
                                       ignore_cauchy = FALSE,
                                       ignore_weibull = FALSE) {
-  if (is.null(max_r)) max_r <- qweibull(.99, shape, scale) * 1000
+  if (is.null(max_r)) max_r <- qweibull(.99, shape, scale) #* 1000
   max_r_cells <- ceiling(max_r/cellsize)
   size <- max_r_cells * 2 + 1
   center <- max_r_cells + 1
   angle_matrix <- new("matrix", 0, size, size)
-  row_matrix <- new("matrix", 0, size, size)
-  col_matrix <- new("matrix", 0, size, size)
+  row_matrix <- row(angle_matrix)
+  col_matrix <- col(angle_matrix)
   distance_matrix <- new("matrix", 0, size, size)
   weibull_kernel <- new("matrix", 0, size, size)
-  i <- j <-  1:size
-  row_matrix[] <- rep(i, times  = max(j))
-  col_matrix <- t(row_matrix)
   dx <- row_matrix - center
   dy <- col_matrix - center
   abs_angle <- atan2(dx, dy)
@@ -333,20 +333,28 @@ CreateRedistKernelWeibull <- function(max_r = 300,
     mu=mu, rho=rho))
   wrpc_kernel <- apply(wrpc_kernel, 2, rev)
   distance_matrix <- (sqrt((row_matrix - center)^2 + (col_matrix - center)^2) *
-      cellsize) / 1000
+      cellsize) #/ 1000
   weibull_kernel[] <- dweibull(as.vector(distance_matrix), shape=shape,
     scale=scale)
-  weibull_kernel[center, center] <- 0  # Forces agent to move from current cell
+  weibull_kernel[center, center] <- 0 # probabilty at cell cell = Inf
+  distance_matrix[distance_matrix > (max_r)] <- NA # (max_r/1000)] <- NA
+  distance_matrix[!is.na(distance_matrix)] <- 1
+  distance_matrix[is.na(distance_matrix)] <- 0
+  distance_matrix[center, center] <- 0 # forces agent to move from center cell
+  wrpc_kernel <- distance_matrix*wrpc_kernel
+  weibull_kernel <- distance_matrix*weibull_kernel
   # This last part deletes the cells at the edge if they are all zero
   if (all(wrpc_kernel[1, ] == 0, wrpc_kernel[, 1] == 0,
-    wrpc_kernel[nrow(wrpc_kernel),] == 0, wrpc_kernel[, ncol(wrpc_kernel)] ==0))
+    wrpc_kernel[nrow(wrpc_kernel),] == 0, wrpc_kernel[, ncol(wrpc_kernel)]==0)){
     wrpc_kernel <- wrpc_kernel[2:(nrow(wrpc_kernel) - 1), 2:(ncol(wrpc_kernel)
       - 1)]
+  }
   if (all(weibull_kernel[1, ] == 0, weibull_kernel[, 1] == 0,
     weibull_kernel[nrow(weibull_kernel),] == 0, weibull_kernel[,
-      ncol(weibull_kernel)] == 0))
+      ncol(weibull_kernel)] == 0)){
     weibull_kernel <- weibull_kernel[2:(nrow(weibull_kernel) - 1),
       2:(ncol(weibull_kernel) - 1)]
+  }
   # Multiply the two kernels together and re-normalize
   if (ignore_cauchy) wrpc_kernel <- 1
   if (ignore_weibull) weibull_kernel <- 1
