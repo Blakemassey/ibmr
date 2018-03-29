@@ -4,7 +4,7 @@
 \alias{UpdateAgentStepData}
 \title{UpdateAgentStepData}
 \usage{
-CreateAgentStepData(agents, sim, init)
+UpdateAgentStepData(agents, sim, init)
 }
 \arguments{
 \item{step_data}{= 'step data' dataframe}

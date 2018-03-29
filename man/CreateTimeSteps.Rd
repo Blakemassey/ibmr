@@ -10,7 +10,7 @@ CreateTimeSteps(step_interval)
 \item{step_interval}{= an Interval object from lubridate that represents the
 current step interval}
 
-\item{time_step_period}{= = a Period object specifying the length of the time
+\item{time_step_period}{= a Period object specifying the length of the time
 step period. Note that if the length of the current_step_interval is equal to
 the time_step_period the function will return a POSIXct object with the same
 date as the end of the current_step_interval.}

@@ -362,6 +362,93 @@ CreateRedistKernelWeibull <- function(max_r = 300,
   redist_kernel <- redist_kernel/sum(redist_kernel)
   return(redist_kernel)
 }
+#' CreateRedistKernelWeibullVonMises
+#'
+#' Create a redistribution kernel matrix based on a mixed von Mises distribution
+#'   for direction and a Weibull distribution for distance.
+#'
+#' @usage CreateRedistKernelWeibullVonMises(max_r, cellsize, mu, rho, shape,
+#'    scale, ignore_cauchy, ignore_weibull)
+#'
+#' @param max_r maximum radius of kernel in meters, default = 300
+#' @param cellsize cell size in meters, default = 30
+#' @param mu1 mu1 parameter of mixed von Mises distribution, 0 radians is due
+#'   East because everything is based on the Unit Circle
+#' @param mu2 mu2 parameter of mixed von Mises distribution, 0 radians is due
+#'   East because everything is based on the Unit Circle
+#' @param kappa1 kappa1 parameter of mixed von Mises distribution
+#' @param kappa2 kappa2 parameter of mixed von Mises distribution
+#' @param mix mixture (p) parameter of mixed von Mises distribution
+#' @param shape shape parameter of Weibull distribution
+#' @param scale scale parameter of Weibull distribution
+#' @param ignore_von_mises logical, removes mixed von Mises kernel's
+#'   contribution to output raster. Default is FALSE.
+#' @param ignore_weibull logical, removes Weibull kernel's contribution to
+#'   output raster. Default is FALSE.
+#'
+#' @return matrix
+#' @details the Weibull parameters need to be based on distance in meters
+#'
+#' @export
+#'
+
+CreateRedistKernelWeibullVonMises <- function(max_r = 300,
+                                              cellsize = 30,
+                                              mu1,
+                                              mu2,
+                                              kappa1,
+                                              kappa2,
+                                              mix,
+                                              shape,
+                                              scale,
+                                              ignore_von_mises = FALSE,
+                                              ignore_weibull = FALSE) {
+  if (is.null(max_r)) max_r <- qweibull(.99, shape, scale) #* 1000
+  max_r_cells <- ceiling(max_r/cellsize)
+  size <- max_r_cells * 2 + 1
+  center <- max_r_cells + 1
+  angle_matrix <- new("matrix", 0, size, size)
+  row_matrix <- row(angle_matrix)
+  col_matrix <- col(angle_matrix)
+  distance_matrix <- new("matrix", 0, size, size)
+  weibull_kernel <- new("matrix", 0, size, size)
+  dx <- row_matrix - center
+  dy <- col_matrix - center
+  abs_angle <- atan2(dx, dy)
+  angle_matrix <- ifelse(abs_angle < 0, (2*pi) + abs_angle, abs_angle)
+  mvm_kernel <- suppressWarnings(CircStats::dmixedvm(angle_matrix,
+    mu1=mu1, mu2=mu2, kappa1=kappa1, kappa2=kappa2, p=mix))
+  mvm_kernel <- apply(mvm_kernel, 2, rev)
+  distance_matrix <- (sqrt((row_matrix - center)^2 + (col_matrix - center)^2) *
+      cellsize) #/ 1000
+  weibull_kernel[] <- dweibull(as.vector(distance_matrix), shape=shape,
+    scale=scale)
+  weibull_kernel[center, center] <- 0 # probabilty at cell cell = Inf
+  distance_matrix[distance_matrix > (max_r)] <- NA # (max_r/1000)] <- NA
+  distance_matrix[!is.na(distance_matrix)] <- 1
+  distance_matrix[is.na(distance_matrix)] <- 0
+  distance_matrix[center, center] <- 0 # forces agent to move from center cell
+  mvm_kernel <- distance_matrix*mvm_kernel
+  weibull_kernel <- distance_matrix*weibull_kernel
+  # This last part deletes the cells at the edge if they are all zero
+  if (all(mvm_kernel[1, ] == 0, mvm_kernel[, 1] == 0,
+    mvm_kernel[nrow(mvm_kernel),] == 0, mvm_kernel[, ncol(mvm_kernel)]==0)){
+    mvm_kernel <- mvm_kernel[2:(nrow(mvm_kernel) - 1), 2:(ncol(mvm_kernel)
+      - 1)]
+  }
+  if (all(weibull_kernel[1, ] == 0, weibull_kernel[, 1] == 0,
+    weibull_kernel[nrow(weibull_kernel),] == 0, weibull_kernel[,
+      ncol(weibull_kernel)] == 0)){
+    weibull_kernel <- weibull_kernel[2:(nrow(weibull_kernel) - 1),
+      2:(ncol(weibull_kernel) - 1)]
+  }
+  # Multiply the two kernels together and re-normalize
+  if (ignore_von_mises) mvm_kernel <- 1
+  if (ignore_weibull) weibull_kernel <- 1
+  redist_kernel <- weibull_kernel*mvm_kernel
+  redist_kernel <- redist_kernel/sum(redist_kernel)
+  return(redist_kernel)
+}
 
 
 #' MovementSubModel
