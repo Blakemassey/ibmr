@@ -218,12 +218,12 @@ CreateParetoKernel <- function(scale,
   return(kernel)
 }
 
-#' CreateRedistKernel
+#' CreateMoveKernel
 #'
-#' Create a redistribution kernel matrix based on a wrapped Cauchy distribution
+#' Create a movement kernel matrix based on a wrapped Cauchy distribution
 #'   for direction and a Pareto distribution for distance.
 #'
-#' @usage CreateRedistKernel(max_r, cellsize, mu, rho, shape, scale,
+#' @usage CreateMoveKernel(max_r, cellsize, mu, rho, shape, scale,
 #'    ignore_cauchy, ignore_pareto)
 #'
 #' @param max_r maximum radius of kernel in meters, default = 300
@@ -240,7 +240,7 @@ CreateParetoKernel <- function(scale,
 #'
 #' @return matrix
 #' @export
-CreateRedistKernel <- function(max_r = 300,
+CreateMoveKernel <- function(max_r = 300,
                                cellsize = 30,
                                mu,
                                rho,
@@ -278,17 +278,17 @@ CreateRedistKernel <- function(max_r = 300,
   # Multiply the two kernels together and re-normalize
   if (ignore_cauchy) wrpc_kernel <- 1
   if (ignore_pareto) gpd_kernel <- 1
-  redist_kernel <- gpd_kernel*wrpc_kernel
-  redist_kernel <- redist_kernel/sum(redist_kernel)
-  return(redist_kernel)
+  move_kernel <- gpd_kernel*wrpc_kernel
+  move_kernel <- move_kernel/sum(move_kernel)
+  return(move_kernel)
 }
 
-#' CreateRedistKernelWeibull
+#' CreateMoveKernelWeibull
 #'
-#' Create a redistribution kernel matrix based on a wrapped Cauchy distribution
+#' Create a movement kernel matrix based on a wrapped Cauchy distribution
 #'   for direction and a Weibull distribution for distance.
 #'
-#' @usage CreateRedistKernelWeibull(max_r, cellsize, mu, rho, shape, scale,
+#' @usage CreateMoveKernelWeibull(max_r, cellsize, mu, rho, shape, scale,
 #'    ignore_cauchy, ignore_weibull)
 #'
 #' @param max_r maximum radius of kernel in meters, default = 300
@@ -308,7 +308,7 @@ CreateRedistKernel <- function(max_r = 300,
 #'
 #' @export
 #'
-CreateRedistKernelWeibull <- function(max_r = 300,
+CreateMoveKernelWeibull <- function(max_r = 300,
                                       cellsize = 30,
                                       mu,
                                       rho,
@@ -358,16 +358,17 @@ CreateRedistKernelWeibull <- function(max_r = 300,
   # Multiply the two kernels together and re-normalize
   if (ignore_cauchy) wrpc_kernel <- 1
   if (ignore_weibull) weibull_kernel <- 1
-  redist_kernel <- weibull_kernel*wrpc_kernel
-  redist_kernel <- redist_kernel/sum(redist_kernel)
-  return(redist_kernel)
+  move_kernel <- weibull_kernel*wrpc_kernel
+  move_kernel <- move_kernel/sum(move_kernel)
+  return(move_kernel)
 }
-#' CreateRedistKernelWeibullVonMises
+
+#' CreateMoveKernelWeibullVonMises
 #'
-#' Create a redistribution kernel matrix based on a mixed von Mises distribution
+#' Create a movement kernel matrix based on a mixed von Mises distribution
 #'   for direction and a Weibull distribution for distance.
 #'
-#' @usage CreateRedistKernelWeibullVonMises(max_r, cellsize, mu, rho, shape,
+#' @usage CreateMoveKernelWeibullVonMises(max_r, cellsize, mu, rho, shape,
 #'    scale, ignore_cauchy, ignore_weibull)
 #'
 #' @param max_r maximum radius of kernel in meters, default = 300
@@ -392,7 +393,7 @@ CreateRedistKernelWeibull <- function(max_r = 300,
 #' @export
 #'
 
-CreateRedistKernelWeibullVonMises <- function(max_r = 300,
+CreateMoveKernelWeibullVonMises <- function(max_r = 300,
                                               cellsize = 30,
                                               mu1,
                                               mu2,
@@ -445,9 +446,9 @@ CreateRedistKernelWeibullVonMises <- function(max_r = 300,
   # Multiply the two kernels together and re-normalize
   if (ignore_von_mises) mvm_kernel <- 1
   if (ignore_weibull) weibull_kernel <- 1
-  redist_kernel <- weibull_kernel*mvm_kernel
-  redist_kernel <- redist_kernel/sum(redist_kernel)
-  return(redist_kernel)
+  move_kernel <- weibull_kernel*mvm_kernel
+  move_kernel <- move_kernel/sum(move_kernel)
+  return(move_kernel)
 }
 
 
@@ -523,35 +524,35 @@ MovementSubModel <- function(sim = sim,
     step_data$step_length[i] <- as.integer(sqrt((step_data[i, "x"] -
       step_data[i+1, "x"])^2 + (step_data[i, "y"]-step_data[i+1, "y"])^2))
   } else {
-    redist <- CreateRedistKernelWeibull(max_r=step_max_r, cellsize=cellsize,
+    move_kernel <- CreateMoveKernelWeibull(max_r=step_max_r, cellsize=cellsize,
       mu=step_data$exp_angle[i], rho=step_cauchy_rho, shape=step_weibull_shape,
       scale=step_weibull_scale)
-    r <- (cellsize*((nrow(redist)-1)/2))+(cellsize/2)
-    redist_raster <- raster::raster(redist, xmn=-r, xmx=r, ymn=-r, ymx=r)
-    redist_shift <- raster::shift(redist_raster, x=step_data$x[i],
+    r <- (cellsize*((nrow(move_kernel)-1)/2))+(cellsize/2)
+    move_raster <- raster::raster(move_kernel, xmn=-r, xmx=r, ymn=-r, ymx=r)
+    move_shift <- raster::shift(move_raster, x=step_data$x[i],
       y=step_data$y[i])
     ### PLACE TO ADD IN OTHER PROBABILITY LAYERS
 
     print(paste("x:", step_data$x[i], " y:", step_data$y[i]))
 
-    redist_shift <- raster::crop(redist_shift, base, snap="in")
+    move_shift <- raster::crop(move_shift, base, snap="in")
     ### NEW ConNestProb Raster
     con_nest <- CreateConNestProb(con_nest_raster,
       gamma_shape=connest_gamma_shape, gamma_rate=connest_gamma_rate,
       x=step_data$x[i], y=step_data$y[i], max_r=step_max_r, cellsize=cellsize,
       base=base)
     print(paste0("con_nest:", as.vector(raster::extent(con_nest)),
-      "redist_shift:", as.vector(raster::extent(redist_shift))))
-    con_nest_crop <- raster::crop(con_nest, redist_shift, snap="out")
-#    landcover_crop <- crop(landcover, redist_shift, snap="out")
-#    hydro_dist_crop <- crop(hydro_dist, redist_shift, snap="out")
-#    homerange_crop <- crop(homerange_kernel, redist_shift, snap="out")
-#    prob_raster <- overlay(redist_shift, landcover_crop, hydro_dist_crop,
+      "move_shift:", as.vector(raster::extent(move_shift))))
+    con_nest_crop <- raster::crop(con_nest, move_shift, snap="out")
+#    landcover_crop <- crop(landcover, move_shift, snap="out")
+#    hydro_dist_crop <- crop(hydro_dist, move_shift, snap="out")
+#    homerange_crop <- crop(homerange_kernel, move_shift, snap="out")
+#    prob_raster <- overlay(move_shift, landcover_crop, hydro_dist_crop,
 #      homerange_crop, fun=function(a,b,c,d) {return(a*b*c*d)}, recycle=FALSE)
 #    prob_raster <- prob_raster/cellStats(prob_raster, stat="sum")
-#    prob_raster <- redist_shift
+#    prob_raster <- move_shift
 #    prob_raster <- prob_raster/cellStats(prob_raster, stat="sum")
-    prob_raster <- raster::overlay(redist_shift, con_nest_crop,
+    prob_raster <- raster::overlay(move_shift, con_nest_crop,
       fun=function(a,b){return(a*b)}, recycle=FALSE)
     prob_raster <- prob_raster/raster::cellStats(prob_raster, stat="sum")
     print("prob_min:", raster::minValue(prob_raster))
