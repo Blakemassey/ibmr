@@ -3,7 +3,7 @@ Type: Package
 Title: Inidividual-Based Modeling (IBM) Simulation Framework for R
 Description: A spatially-explicit individual-based modelling (IBM) simulation
     framework designed for ecological systems.
-Version: 0.0.90000
+Version: 0.0.9180402
 License: GPL 2.0
 Authors@R: c(
     person("Javan", "Bauder",, "jbauder@oriannesociety.org", c("aut")),

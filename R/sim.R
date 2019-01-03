@@ -52,12 +52,13 @@ AgingSubModel <- function(agent_states = agent_states,
 BehaviorSubModelBAEA <- function(sim = sim,
                                  agent_states = agent_states,
                                  step_data = step_data,
-                                 step = step) {
+                                 step = step){
   sex <- agent_states$sex
   beta <- as.matrix(sim$pars$classes[[sex]]$constant$fixed$behavior_betas)
   step_row <- which(step_data$datetime == step)
   current_behavior <- as.numeric(step_data[step_row, "behavior"])
   current_time_prop <- as.numeric(step_data[step_row, "time_proportion"])
+  next_time_prop <- as.numeric(step_data[step_row + 1, "time_proportion"])
   step_data <- as.data.frame(step_data)
   gamma <- diag(5)
   g <- beta[1, ]  #  g = state transition probabilities intercepts
@@ -80,17 +81,35 @@ BehaviorSubModelBAEA <- function(sim = sim,
     gamma3[, 5] <- 1
     #gamma3 <- gamma3/apply(gamma3, 1, sum)
   }
-  step_data[step_row + 1, "behavior"] <- sample(1:5, size = 1,
-    prob = gamma3[current_behavior, ])  # trans prob. given behavior
+  if(current_behavior == 1){ # prevents 1->5 (Cruise to Roost)
+    gamma3[, 5] <- 0
+    gamma3 <- gamma3/apply(gamma3, 1, sum)
+    gamma3[, 5] <- 0
+  }
+  if(current_behavior == 5){ # prevents 5->1 (Roost to Cruise)
+    gamma3[, 1] <- 0
+    gamma3 <- gamma3/apply(gamma3, 1, sum)
+    gamma3[, 1] <- 0
+  }
+  # trans prob. given current behavior
+  next_behavior <- sample(1:5, size = 1, prob = gamma3[current_behavior, ])
 
-  if(current_time_prop == 1){
-    if (current_behavior %in% c(3,5)){
-      step_data[step_row + 1, "behavior"] <- current_behavior
-    } else {
-      overnight_behavior <- sample(c(3,5), 1)
-      step_data[step_row, "behavior"] <- overnight_behavior
-      step_data[step_row + 1, "behavior"] <- overnight_behavior
+  if(step_row != nrow(step_data)) { # prevent the creation of an "extra" step
+    if(next_time_prop == 1){ # select Nest or Roost only for last location of day
+      if (next_behavior %in% c(3,5)){
+        step_data[step_row + 1, "behavior"] <- next_behavior
+      } else { # forces selection of Nest or Roost
+        gamma3[, c(1,2,4)] <- 0
+        gamma3 <- gamma3/apply(gamma3, 1, sum)
+        gamma3[, c(1,2,4)] <- 0
+        next_behavior <- sample(1:5, size = 1, prob = gamma3[current_behavior,])
+        step_data[step_row + 1, "behavior"] <- next_behavior
+      }
     }
+    if(current_time_prop == 1){
+      step_data[step_row + 1, "behavior"] <- current_behavior
+    }
+    step_data[step_row + 1, "behavior"] <- next_behavior
   }
   return(step_data)
 }
@@ -1192,7 +1211,7 @@ UpdateAgentParsData <- function(sim = sim,
 #'
 #' Creates and updates agents interval data dataframe
 #'
-#' @usage CreateAgentInData(agents, init)
+#' @usage UpdateAgentsReport(agents, init)
 #'
 #' @param sim = 'sim' list
 #' @param rep_interval = rep_interval
@@ -1466,6 +1485,76 @@ UpdateSpatial <- function(sim = sim,
     return(sim)
   }
 }
+
+
+#' UpdateSpatialBAEA
+#'
+#' Creates and updates population interval dataframe
+#'
+#' @usage UpdateSpatialBAEA(sim, init)
+#'
+#' @param sim = sim list, MUST be included in function's parameter argument
+#' needed when: when init == TRUE
+#' @param init = logical, whether or not this is the initation step
+#'
+#' @return an 'agents' list
+#' @export
+#'
+UpdateSpatialBAEA <- function(sim = sim,
+                              init = TRUE) {
+  sim <- sim
+  if (init == TRUE) {
+    spatial <- sim$spatial
+    base <- spatial$base
+    nests <- spatial$nests
+    behavior_levels <- c("Cruise", "Flight", "Nest", "Perch", "Roost")
+    # male and female same for now
+    move_pars <- sim$pars$classes$male$constant$fixed$move_pars %>%
+      mutate(
+        behavior_num = as.numeric(factor(behavior, levels = behavior_levels)),
+        behavior_next_num = as.numeric(factor(behavior_next,
+          levels = behavior_levels))) %>%
+      mutate(ids = paste0(behavior_num, "_", behavior_next_num))
+    move_pars_ids <- move_pars$ids
+    move_kernels <- as.list(setNames(rep(NA, nrow(move_pars)),
+      move_pars_ids), move_pars_ids)
+    for (i in 1:nrow(move_pars)){
+      move_pars_i <- move_pars[i, ]
+      ignore_von_mises <- ifelse(move_pars_i$behavior[1] %in% c("Cruise",
+        "Flight"), FALSE, TRUE)
+      kernel_i <- CreateMoveKernelWeibullVonMises(
+          max_r = NULL,
+          cellsize = 30,
+          mu1 = move_pars_i$mvm_mu1[1],
+          mu2 = move_pars_i$mvm_mu2[1],
+          kappa1 = move_pars_i$mvm_kappa1[1],
+          kappa2 = move_pars_i$mvm_kappa2[1],
+          mix = move_pars_i$mvm_prop[1],
+          shape = move_pars_i$weibull_shape[1],
+          scale = move_pars_i$weibull_scale[1],
+          ignore_von_mises = ignore_von_mises)
+      r <- (30*((nrow(kernel_i)-1)/2))+(30/2)
+      kernel_raster <- raster::raster(kernel_i, xmn=-r, xmx=r, ymn=-r, ymx=r)
+      move_kernels[[i]] <- kernel_raster
+      names(move_kernels[[i]]) <- paste0(move_pars_i$behavior_behavior[1])
+    }
+    male <- NamedList(move_kernels)
+    female <- NamedList(move_kernels)
+    classes <- NamedList(male, female)
+
+    spatial <- NamedList(base, nests, classes)
+    sim$spatial <- spatial
+    return(sim)
+  } else {
+#   spatial_timer <- UpdateSpatialTimer(spatial_timer)
+#   if (spatial_timer == timer_number) UpdateSpatial(); rm(spatial_timer)
+#   spatial <- append()
+#   spatial <- sim$spatial
+#   sim$spatial <- spatial
+    return(sim)
+  }
+}
+
 
 #' WriteSimList
 #'

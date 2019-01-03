@@ -4,7 +4,7 @@
 \alias{UpdateAgentsReport}
 \title{UpdateAgentsReport}
 \usage{
-CreateAgentInData(agents, init)
+UpdateAgentsReport(agents, init)
 }
 \arguments{
 \item{sim}{= 'sim' list}

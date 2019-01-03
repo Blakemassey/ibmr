@@ -4,7 +4,7 @@
 \alias{AgingSubModel}
 \title{AgingSubModel}
 \usage{
-AgingSubModel(agent_states, dateime)
+AgingSubModel(agent_states, step_data, step)
 }
 \arguments{
 \item{agent_states}{agent_states object}

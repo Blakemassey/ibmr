@@ -368,13 +368,11 @@ CreateMoveKernelWeibull <- function(max_r = 300,
 #' Create a movement kernel matrix based on a mixed von Mises distribution
 #'   for direction and a Weibull distribution for distance.
 #'
-#' @usage CreateMoveKernelWeibullVonMises(max_r, cellsize, mu1, mu2, kappa1,
-#'    kappa2, mix, rho, shape, scale, ignore_cauchy, ignore_weibull)
+#' @usage CreateMoveKernelWeibullVonMises(max_r, cellsize, mu, rho, shape,
+#'    scale, ignore_cauchy, ignore_weibull)
 #'
 #' @param max_r maximum radius of kernel in meters, default = 300
 #' @param cellsize cell size in meters, default = 30
-#' @param pars dataframe with columns for parameters, default is NULL. Only uses
-#'   first row. Overrides the paramaters below (mu1:scale)
 #' @param mu1 mu1 parameter of mixed von Mises distribution, 0 radians is due
 #'   East because everything is based on the Unit Circle
 #' @param mu2 mu2 parameter of mixed von Mises distribution, 0 radians is due
@@ -396,27 +394,17 @@ CreateMoveKernelWeibull <- function(max_r = 300,
 #'
 
 CreateMoveKernelWeibullVonMises <- function(max_r = 300,
-                                            cellsize = 30,
-                                            pars = NULL,
-                                            mu1,
-                                            mu2,
-                                            kappa1,
-                                            kappa2,
-                                            mix,
-                                            shape,
-                                            scale,
-                                            ignore_von_mises = FALSE,
-                                            ignore_weibull = FALSE) {
-  if(!is.null(pars)){
-    mu1 = pars$mvm_mu1[1]
-    mu2 = pars$mvm_mu2[1]
-    kappa1 = pars$mvm_kappa1[1]
-    kappa2 = pars$mvm_kappa2[1]
-    mix = pars$mvm_prop[1]
-    shape = pars$weibull_shape[1]
-    scale = pars$weibull_scale[1]
-  }
-  if(is.null(max_r)) max_r <- qweibull(.99, shape, scale) #* 1000
+                                              cellsize = 30,
+                                              mu1,
+                                              mu2,
+                                              kappa1,
+                                              kappa2,
+                                              mix,
+                                              shape,
+                                              scale,
+                                              ignore_von_mises = FALSE,
+                                              ignore_weibull = FALSE) {
+  if (is.null(max_r)) max_r <- qweibull(.99, shape, scale) #* 1000
   max_r_cells <- ceiling(max_r/cellsize)
   size <- max_r_cells * 2 + 1
   center <- max_r_cells + 1
