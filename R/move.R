@@ -743,10 +743,10 @@ MovementSubModelBAEA <- function(sim = sim,
 #'
 #' Non-linear Range Rescale Gamma Distribution
 #'
-#' @param x numeric
-#' @param shape numeric
+#' @param x numeric, x value
+#' @param shape numeric, Gamma shape
 #' @param rate numeric
-#' @param min numeric
+#' @param min numeric, value
 #' @param max numeric
 #' @param lowBound numeric
 #' @param upBound numeric
@@ -776,8 +776,8 @@ NonlinearRangeRescaleGamma <- function(x,
     upBound <- sqrt((xmin(movement_kernel)-xmax(movement_kernel))^2+
                       (ymin(movement_kernel)-ymax(movement_kernel))^2)/1000
   }
-  # Get predicted y (cummulative gamma) for x
-  y_pred <- pgamma(x, shape=shape, rate=rate, lower.tail=FALSE)
+  # Get predicted y (gamma pdf) for x
+  y_pred <- ppareto(x, shape=shape, rate=rate, lower.tail=FALSE)
   rescale <- lowBound + (((y_pred-min)/(max-min)) * (upBound-lowBound))
   if(negative==TRUE){
     rescale <- rescale*-1
@@ -785,5 +785,51 @@ NonlinearRangeRescaleGamma <- function(x,
   return(rescale)
 }
 
+#' NonlinearRangeRescalePareto
+#'
+#' Non-linear Range Rescale Pareto Distribution
+#'
+#' @param x numeric, x (independent variable) value
+#' @param scale numeric, scale (sigma) parameter for texmex::gpd
+#' @param shape numeric, shape (xi) parameter for texmex::gpd
+#' @param min_prob numeric, minimum Pareto probability value
+#' @param max_prob numeric, maximum Pareto probability value
+#' @param lower_bound numeric, lower limit for rescaled y values
+#' @param upper_bound numeric, upper limit for rescaled y values
+#' @param movement_kernel kernel, may be used to get the upper_bound
+#' @param negative logical, whether or not to multiple outcome by -1
+#'
+#' @return vector
+#' @export
+#'
+NonlinearRangeRescalePareto <- function(x,
+                                        scale = shape,
+                                        shape = shape,
+                                        min_prob = NULL,
+                                        max_prob = NULL,
+                                        lower_bound = 1,
+                                        upper_bound = NULL,
+                                        movement_kernel = movement_kernel,
+                                        negative = TRUE){
+  if(is.null(min_prob)){
+    max_distance <- texmex::qgpd(0.999, sigma=scale, xi=shape)
+    min_prob <- texmex::pgpd(max_distance, sigma=scale, xi=shape, lower.tail=FALSE)
+  }
+  if(is.null(max_prob)){
+    max_prob <- texmex::pgpd(.075, sigma=shape, xi=scale, lower.tail=FALSE)
+  }
+  if(is.null(upper_bound)){
+    upper_bound <- sqrt((xmin(movement_kernel)-xmax(movement_kernel))^2+
+                      (ymin(movement_kernel)-ymax(movement_kernel))^2)/1000
+  }
+  # Get predicted y (gamma pdf) for x
+  #x = 5
+  y_pred <- texmex::pgpd(x, sigma=scale, xi=shape, lower.tail=FALSE)
+  rescale <- lower_bound + (((y_pred-min)/(max-min)) * (upper_bound-lower_bound))
+  if(negative==TRUE){
+    rescale <- rescale*-1
+  }
+  return(rescale)
+}
 
 
