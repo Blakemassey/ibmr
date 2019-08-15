@@ -4,7 +4,8 @@
 \alias{ReproductionSubModel}
 \title{ReproductionSubModel}
 \usage{
-ReproductionSubModel(agent_states = agent_states, step_data = step_data)
+ReproductionSubModel(agent_states = agent_states,
+  step_data = step_data)
 }
 \arguments{
 \item{agent_states}{= a 'agent_states' list object}

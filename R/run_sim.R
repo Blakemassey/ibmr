@@ -226,11 +226,11 @@ CreateRedistributionKernel <- function(raster_stack, combine_method, adjust_dist
   cellsize <- res(base)[1]
 
   if(sim$pars$global$combine_method=="product"){
-    prob_raster <- raster:::overlay(raster_stack,
+    prob_raster <- raster::overlay(raster_stack,
                                     fun=function(a,b,c,d,e) {return(a*b*c*d*e)},
                                     recycle=FALSE, unstack=TRUE)
   } else {
-    prob_raster <- raster:::overlay(raster_stack,
+    prob_raster <- raster::overlay(raster_stack,
                                     fun=function(a,b,c,d,e) {return((a*b*c*d*e)^(1/5))},
                                     recycle=FALSE, unstack=TRUE)
   }

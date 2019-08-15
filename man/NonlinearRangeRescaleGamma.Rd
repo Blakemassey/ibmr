@@ -9,13 +9,13 @@ NonlinearRangeRescaleGamma(x, shape = shape, rate = rate, min = NULL,
   movement_kernel = movement_kernel, negative = TRUE)
 }
 \arguments{
-\item{x}{numeric}
+\item{x}{numeric, x value}
 
-\item{shape}{numeric}
+\item{shape}{numeric, Gamma shape}
 
 \item{rate}{numeric}
 
-\item{min}{numeric}
+\item{min}{numeric, value}
 
 \item{max}{numeric}
 
