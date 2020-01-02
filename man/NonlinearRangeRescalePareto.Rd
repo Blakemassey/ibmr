@@ -4,10 +4,17 @@
 \alias{NonlinearRangeRescalePareto}
 \title{NonlinearRangeRescalePareto}
 \usage{
-NonlinearRangeRescalePareto(x, scale = shape, shape = shape,
-  min_prob = NULL, max_prob = NULL, lower_bound = 1,
-  upper_bound = NULL, movement_kernel = movement_kernel,
-  negative = TRUE)
+NonlinearRangeRescalePareto(
+  x,
+  scale = shape,
+  shape = shape,
+  min_prob = NULL,
+  max_prob = NULL,
+  lower_bound = 1,
+  upper_bound = NULL,
+  movement_kernel = movement_kernel,
+  negative = TRUE
+)
 }
 \arguments{
 \item{x}{numeric, x (independent variable) value}

@@ -4,8 +4,16 @@
 \alias{CreateConNestProb}
 \title{CreateConNestProb}
 \usage{
-CreateConNestProb(con_nest_raster, gamma_shape, gamma_rate, x, y, max_r,
-  cellsize, base)
+CreateConNestProb(
+  con_nest_raster,
+  gamma_shape,
+  gamma_rate,
+  x,
+  y,
+  max_r,
+  cellsize,
+  base
+)
 }
 \arguments{
 \item{con_nest_raster}{Raster,}

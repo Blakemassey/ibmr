@@ -437,29 +437,19 @@ CreateMoveKernelWeibullVonMises <- function(max_r = 300,
   weibull_kernel[] <- dweibull(as.vector(distance_matrix), shape=shape,
     scale=scale)
   weibull_kernel[center, center] <- 0 # probabilty at cell cell = Inf
+  absolute_distance_matrix <- distance_matrix
   distance_matrix[distance_matrix > (max_r)] <- NA # (max_r/1000)] <- NA
   distance_matrix[!is.na(distance_matrix)] <- 1
   distance_matrix[is.na(distance_matrix)] <- 0
   distance_matrix[center, center] <- 0 # forces agent to move from center cell
   mvm_kernel <- distance_matrix*mvm_kernel
   weibull_kernel <- distance_matrix*weibull_kernel
-  # This last part deletes the cells at the edge if they are all zero
-  if (all(mvm_kernel[1, ] == 0, mvm_kernel[, 1] == 0,
-    mvm_kernel[nrow(mvm_kernel),] == 0, mvm_kernel[, ncol(mvm_kernel)]==0)){
-    mvm_kernel <- mvm_kernel[2:(nrow(mvm_kernel) - 1), 2:(ncol(mvm_kernel)
-      - 1)]
-  }
-  if (all(weibull_kernel[1, ] == 0, weibull_kernel[, 1] == 0,
-    weibull_kernel[nrow(weibull_kernel),] == 0, weibull_kernel[,
-      ncol(weibull_kernel)] == 0)){
-    weibull_kernel <- weibull_kernel[2:(nrow(weibull_kernel) - 1),
-      2:(ncol(weibull_kernel) - 1)]
-  }
   # Multiply the two kernels together and re-normalize
   if (ignore_von_mises) mvm_kernel <- 1
   if (ignore_weibull) weibull_kernel <- 1
   move_kernel <- weibull_kernel*mvm_kernel
   move_kernel <- move_kernel/sum(move_kernel)
+  move_kernel[absolute_distance_matrix > (max_r)] <- NA  # only NA in last step
   return(move_kernel)
 }
 

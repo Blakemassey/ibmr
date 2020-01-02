@@ -4,9 +4,17 @@
 \alias{NonlinearRangeRescaleGamma}
 \title{NonlinearRangeRescaleGamma}
 \usage{
-NonlinearRangeRescaleGamma(x, shape = shape, rate = rate, min = NULL,
-  max = NULL, lowBound = 1, upBound = NULL,
-  movement_kernel = movement_kernel, negative = TRUE)
+NonlinearRangeRescaleGamma(
+  x,
+  shape = shape,
+  rate = rate,
+  min = NULL,
+  max = NULL,
+  lowBound = 1,
+  upBound = NULL,
+  movement_kernel = movement_kernel,
+  negative = TRUE
+)
 }
 \arguments{
 \item{x}{numeric, x value}

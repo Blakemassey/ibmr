@@ -3,7 +3,6 @@
 \docType{package}
 \name{ibmr}
 \alias{ibmr}
-\alias{ibmr-package}
 \title{ibmr: An individual-based model (IBM) framework for conducting
   spatially-explicit simulation.}
 \description{
