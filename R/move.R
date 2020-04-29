@@ -453,7 +453,6 @@ CreateMoveKernelWeibullVonMises <- function(max_r = 300,
   return(move_kernel)
 }
 
-
 #' MovementSubModel
 #'
 #' Movement submodel that predicts movements based on current location,
