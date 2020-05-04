@@ -1,7 +1,6 @@
 # -------------------- HOMERANGE FUNCTIONS -------------------------------------
 # General functions for creation, analysis, and simulation of home ranges
 
-
 #' CreateHomeRangeKernels
 #'
 #' Creates RasterLayers of homerange kernels based on home centroids

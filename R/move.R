@@ -553,6 +553,9 @@ MovementSubModel <- function(sim = sim,
 #    prob_raster <- prob_raster/cellStats(prob_raster, stat="sum")
 #    prob_raster <- move_shift
 #    prob_raster <- prob_raster/cellStats(prob_raster, stat="sum")
+
+    # USE GEOMETRIC MEAN for final probability layer?
+
     prob_raster <- raster::overlay(move_shift, con_nest_crop,
       fun=function(a,b){return(a*b)}, recycle=FALSE)
     prob_raster <- prob_raster/raster::cellStats(prob_raster, stat="sum")
@@ -698,6 +701,8 @@ MovementSubModelBAEA <- function(sim = sim,
 #      fun=function(a,b){return(a*b)}, recycle=FALSE)
     prob_raster <- prob_raster/raster::cellStats(prob_raster, stat = "sum")
     prob_raster[prob_raster <= .000001] <- 0
+
+      # USE GEOMETRIC MEAN for final probability layer?
 
     raster::crs(prob_raster) <- raster::crs(sim$spatial$base)
 #    ExportKMLRasterOverlayWithTime(raster = prob_raster, time = step,

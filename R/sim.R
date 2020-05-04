@@ -48,7 +48,6 @@ AgingSubModel <- function(agent_states = agent_states,
 #' @return step_states
 #' @export
 #'
-
 BehaviorSubModelBAEA <- function(sim = sim,
                                  agent_states = agent_states,
                                  step_data = step_data,
@@ -114,7 +113,6 @@ BehaviorSubModelBAEA <- function(sim = sim,
   return(step_data)
 }
 
-
 #' CalculateCurrentAge
 #'
 #' Calculates current age of agent at a given step
@@ -127,7 +125,6 @@ BehaviorSubModelBAEA <- function(sim = sim,
 #' @return current_age in days
 #' @export
 #'
-
 CalculateCurrentAge <- function(datetime,
                                 birth_date) {
   current_age <- as.numeric(difftime(datetime, birth_date,
@@ -314,6 +311,7 @@ CreateBirthDate <- function(input = sim$agents$input){
   }
   return(input)
 }
+
 #' CreateParsClassConstant
 #'
 #' Creates a parameter class 'constant'
@@ -431,7 +429,6 @@ CreateParsGlobal <- function(sim_start = as.POSIXct("2015-01-01", tz = "UTC"),
 #' @note Where there are < 10 runs, there will have no leading zeros, when
 #' there are between 10 and 99 runs, there will be a leading zero for runs
 #' numbered < 10.
-
 CreateRunsList <- function(runs = runs) {
   format <- paste0("%0", nchar(runs), "d")
   runs_list <- list()
@@ -441,8 +438,6 @@ CreateRunsList <- function(runs = runs) {
   }
   return(runs_list)
 }
-
-
 
 #' CreateReportIntervals
 #'
@@ -483,7 +478,6 @@ CreateRunsList <- function(runs = runs) {
 #' possibility that the day and month will be inverted because dates with both
 #' values <12 can be confused (e.g. 02-10 can be either February 10th or October
 #' 2nd. Date format: "10Feb" or "02Oct" is preferred.
-
 CreateReportIntervals <- function(sim = sim) {
   sim_start <- sim$pars$global$sim_start
   sim_period <- sim$pars$global$sim_period
@@ -722,7 +716,6 @@ CreateTimeStepsBAEA <- function(step_interval = step_interval,
 #' @return a list of intervals
 #' @export
 #'
-
 CreateTimeStepsInStepIntervalBAEA <- function(step_interval = step_interval,
                                               sim = sim) {
   time_step_period = sim$pars$global$time_step_period
@@ -844,7 +837,6 @@ ExtractUnitFromPeriod <- function(period) {
 #'
 #' @return an Interval object
 #' @export
-
 FindFirstReportInterval <- function(sim_start,
                                     rep_interval){
   start_year <- as.Date(0, origin=as.Date(floor_date(sim_start, "year")))
@@ -971,7 +963,6 @@ FindSeasonFromDatetime <- function(datetime = datetime,
 #' @return  step_data
 #' @export
 #'
-
 LastDailySubModelBAEA <- function(sim = sim,
                                   agent_states = agent_states,
                                   step_data = step_data,
@@ -1003,7 +994,6 @@ LastDailySubModelBAEA <- function(sim = sim,
 #' @note Original function came from Ben Bolker's answer on StackOverflow:
 #' "http://stackoverflow.com/questions/16951080"
 #'
-
 NamedList <- function(...) {
   list <- list(...)
   str_name <- sapply(substitute(list(...)),deparse)[-1]
@@ -1090,7 +1080,6 @@ ReturnAliveIds <- function(all = sim$agents$all){
 #' @return a vector
 #' @export
 #'
-
 ReturnAliveSeq <- function(sim = sim){
   all <- sim$agents$all
   alive_seq <- vector()
@@ -1115,7 +1104,6 @@ ReturnAliveSeq <- function(sim = sim){
 #' @return period object's unit as a chararcter
 #' @export
 #'
-
 ReturnPopReportData <- function(sim=sim,
                                 agents = agents,
                                 rep_interval=rep_interval) {
@@ -1166,7 +1154,6 @@ ReturnReportStepData <- function(agent=agent,
 #' @export
 #'
 #' @note Just a placeholder for now.
-
 SurvivalSubModel <- function(agent_states = agent_states,
                              step_data = step_data) {
   agent_states <- agent_states
@@ -1354,7 +1341,6 @@ UpdateAgentStepData <- function(step_data = NULL,
 #' @return an 'step_data' dataframe
 #' @export
 #'
-
 UpdateAgentStepDataBAEA <- function(step_data = NULL,
                                     sim = sim,
                                     init = FALSE,
@@ -1416,7 +1402,6 @@ UpdateAgentStepDataBAEA <- function(step_data = NULL,
     return(step_data)
   }
 }
-
 
 #' UpdatePopReport
 #'
@@ -1486,7 +1471,6 @@ UpdateSpatial <- function(sim = sim,
   }
 }
 
-
 #' UpdateSpatialBAEA
 #'
 #' Creates and updates population interval dataframe
@@ -1554,7 +1538,6 @@ UpdateSpatialBAEA <- function(sim = sim,
     return(sim)
   }
 }
-
 
 #' WriteSimList
 #'
