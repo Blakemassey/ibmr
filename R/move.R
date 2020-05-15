@@ -39,6 +39,7 @@ AngleToPoint <- function(origin_x,
 #' @param xmin minimum value of x that establishes the grid arrangement
 #' @param ymin minimum value of y that establishes the grid arrangement
 #' @param cellsize cell size in units of the x and y values
+#' @param return character, what to return (x, y, or NA). NA = c(x,y) and is default
 #'
 #' @return vector of centered x and y (i.e., (x,y))
 #' @export
@@ -47,11 +48,18 @@ CenterXYInCell <- function(x,
                            y,
                            xmin,
                            ymin,
-                           cellsize) {
-    x <- xmin + (floor(((x-xmin)/cellsize))*cellsize) + (cellsize/2)
-    y <- ymin + (floor(((y-ymin)/cellsize))*cellsize) + (cellsize/2)
-    output <- c(x, y)
-    return(output)
+                           cellsize,
+                           output = NA) {
+  x <- xmin + (floor(((x-xmin)/cellsize))*cellsize) + (cellsize/2)
+  y <- ymin + (floor(((y-ymin)/cellsize))*cellsize) + (cellsize/2)
+  if(output == 'x') {
+    result <- x
+  } else if(output == 'y'){
+    result <- y
+  } else {
+    result <- c(x, y)
+  }
+  return(result)
 }
 
 
@@ -180,6 +188,96 @@ CreateConNestProb <- function(con_nest_raster,
 #  points(xy[1], xy[2], pch=20, col="blue")
   return(con_nest_rescale)
 }
+
+
+
+#' Create con_nest distance rasters for simulation
+#'
+#' @param agents list, agents
+#' @param nest_set dataframe, nests with coordinates
+#' @param base raster, the base raster layer for the analysis
+#' @param output_dir character, location for the output
+#' @param max_r numeric, maximum radius for kernels. Default = 30000
+#' @param write_con_nest_all logical, whether or not to write the
+#'
+#' @export
+#'
+
+CreateSimConNestDistRasters <- function(agents,
+                                       nest_set,
+                                       base = base,
+                                       output_dir = "Output/Sim/Territorial",
+                                       max_r = 30000,
+                                       write_con_nest_all = TRUE){
+  if (!dir.exists(output_dir)) dir.create(output_dir)
+  input <- agents %>% pluck("input")
+  raster_files <- vector()
+  cellsize <- raster::res(base)[1]
+  max_r_cells <- ceiling(max_r/cellsize)
+  xmin <- xmin(base)
+  ymin <- ymin(base)
+  for (i in 1:nrow(nest_set)){
+    nest_set[i, "x"] <- CenterXYInCell(nest_set[i, "long_utm"],
+      nest_set[i, "lat_utm"], xmin, ymin, cellsize)[1]
+    nest_set[i, "y"] <- CenterXYInCell(nest_set[i, "long_utm"],
+      nest_set[i, "lat_utm"], xmin, ymin, cellsize)[2]
+  }
+  nest_set_sf <- sf::st_as_sf(x = nest_set, coords = c("x", "y"), crs = 32619)
+  con_nest_list <- purrr::map(unique(input$nest_id), ~ NULL)
+  names(con_nest_list) <- unique(input$nest_id)
+  for (i in unique(input$nest_id)){
+    nest_i <- i %>% str_replace_all(., "nest_", "")
+    nest_set_i <- nest_set %>% slice(which(nest_set$nest_site == nest_i))
+    nest_i_xy <- nest_set_i %>% dplyr::slice(1) %>%
+      dplyr::select(long_utm, lat_utm) %>% as.vector()
+    home_i_x <- CenterXYInCell(nest_i_xy[1], nest_i_xy[2], xmin, ymin,
+      cellsize)[[1]] # home nest long
+    home_i_y <- CenterXYInCell(nest_i_xy[1], nest_i_xy[2], xmin, ymin,
+      cellsize)[[2]] # home nest lat
+    home_i_xy <- tibble::tibble(x = home_i_x, y = home_i_y)
+    home_i_sf <- sf::st_as_sf(x = home_i_xy, coords = c("x", "y"), crs=32619)
+    cell_extent <- raster::extent(home_i_x - (cellsize/2),
+      home_i_x + (cellsize/2), home_i_y - (cellsize/2),
+      home_i_y + (cellsize/2))
+    cell <- raster::setValues(raster(cell_extent, crs = projection(base),
+      res = cellsize), 100)
+    home_ext <- raster::extend(cell, c(max_r_cells, max_r_cells), value = NA)
+    summary(home_ext)
+    home_dist <- raster::distance(home_ext)
+    home_dist[home_dist > max_r] <- NA
+    nest_set_sf_i <- nest_set_sf %>%
+      dplyr::filter(nest_site != nest_i) # conspecific nests
+    home_i_buff <- sf::st_buffer(home_i_sf, max_r)
+    nests_i <- sf::st_contains(home_i_buff, nest_set_sf_i)
+    nest_set_sf_k <- nest_set_sf_i %>% dplyr::slice(unlist(nests_i))
+    con_dist <- raster::distanceFromPoints(home_ext,
+      sf::st_coordinates(nest_set_sf_k)) # raster of nests
+    # Nearest neighbor nest distance at home nest
+    home_con_dist <- raster::extract(con_dist, home_i_xy)
+    con_dist_home <- raster::calc(con_dist, function(x){home_con_dist - x})
+    con_nest_k <- raster::overlay(home_dist, con_dist_home,
+      fun = function(x,y){round(x + y)})
+#    filename_k <- file.path(output_dir, paste0("ConNest_", i, ".tif"))
+#    raster::writeRaster(con_nest_k, filename = filename_k, format = "GTiff",
+#      overwrite = TRUE)
+#    writeLines(noquote(paste("Writing:", filename_k)))
+    con_nest_list[[which(names(con_nest_list) == i)]] <- con_nest_k
+#    raster_files <- append(raster_files, filename_k)
+  }
+#  con_nest <- list()
+  #for(i in 1:length(con_nest_list)){con_nest[[i]] <- raster(raster_files[i])}
+#  con_nest_all <- do.call(raster::merge, unlist(con_nest_list))
+#  filename <- "Output/Analysis/Territorial/ConNest_All.tif"
+#  if(isTRUE(write_con_nest_all)){
+#    raster::writeRaster(con_nest_all, filename = filename, format = "GTiff",
+#      overwrite = TRUE)
+#  }
+#  writeLines(noquote(paste("Writing:", filename)))
+  return(con_nest_list)
+}
+
+
+
 
 #' CreateParetoKernel
 #'
@@ -420,11 +518,11 @@ CreateMoveKernelWeibullVonMises <- function(max_r = 300,
   max_r_cells <- ceiling(max_r/cellsize)
   size <- max_r_cells * 2 + 1
   center <- max_r_cells + 1
-  angle_matrix <- new("matrix", 0, size, size)
+  angle_matrix <- matrix(0, nrow = size, ncol = size)
   row_matrix <- row(angle_matrix)
   col_matrix <- col(angle_matrix)
-  distance_matrix <- new("matrix", 0, size, size)
-  weibull_kernel <- new("matrix", 0, size, size)
+  distance_matrix <- matrix(0, nrow = size, ncol = size)
+  weibull_kernel <- matrix(0, nrow = size, ncol = size)
   dx <- row_matrix - center
   dy <- col_matrix - center
   abs_angle <- atan2(dx, dy)
@@ -676,8 +774,8 @@ MovementSubModelBAEA <- function(sim = sim,
       step_data[i+1, "x"])^2 + (step_data[i, "y"]-step_data[i+1, "y"])^2))
   } else if (step_type == "Move"){
     move_kernel <-sim$spatial$classes[[sex]][["move_kernels"]][[behavior_trans]]
-    move_shift <- raster::shift(move_kernel, x=step_data$x[i],
-      y=step_data$y[i])
+    move_shift <- raster::shift(move_kernel, dx=step_data$x[i],
+      dy=step_data$y[i])
     ### PLACE TO ADD IN OTHER PROBABILITY LAYERS
     #print(paste("x:", step_data$x[i], " y:", step_data$y[i]))
     move_shift <- raster::crop(move_shift, base, snap="in")
@@ -701,7 +799,7 @@ MovementSubModelBAEA <- function(sim = sim,
 #      fun=function(a,b){return(a*b)}, recycle=FALSE)
     prob_raster <- prob_raster/raster::cellStats(prob_raster, stat = "sum")
     prob_raster[prob_raster <= .000001] <- 0
-
+    prob_raster[is.na(prob_raster)] <- 0
       # USE GEOMETRIC MEAN for final probability layer?
 
     raster::crs(prob_raster) <- raster::crs(sim$spatial$base)

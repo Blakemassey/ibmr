@@ -16,6 +16,8 @@ CenterXYInCell(x, y, xmin, ymin, cellsize)
 \item{ymin}{minimum value of y that establishes the grid arrangement}
 
 \item{cellsize}{cell size in units of the x and y values}
+
+\item{return}{character, what to return (x, y, or NA). NA = c(x,y) and is default}
 }
 \value{
 vector of centered x and y (i.e., (x,y))

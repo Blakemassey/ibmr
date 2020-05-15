@@ -1491,6 +1491,7 @@ UpdateSpatialBAEA <- function(sim = sim,
     spatial <- sim$spatial
     base <- spatial$base
     nests <- spatial$nests
+    con_nest_dist <- spatial$con_nest_dist
     behavior_levels <- c("Cruise", "Flight", "Nest", "Perch", "Roost")
     # male and female same for now
     move_pars <- sim$pars$classes$male$constant$fixed$move_pars %>%
@@ -1525,8 +1526,7 @@ UpdateSpatialBAEA <- function(sim = sim,
     male <- NamedList(move_kernels)
     female <- NamedList(move_kernels)
     classes <- NamedList(male, female)
-
-    spatial <- NamedList(base, nests, classes)
+    spatial <- NamedList(base, nests, classes, con_nest_dist)
     sim$spatial <- spatial
     return(sim)
   } else {
