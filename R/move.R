@@ -39,9 +39,9 @@ AngleToPoint <- function(origin_x,
 #' @param xmin minimum value of x that establishes the grid arrangement
 #' @param ymin minimum value of y that establishes the grid arrangement
 #' @param cellsize cell size in units of the x and y values
-#' @param return character, what to return (x, y, or NA). NA = c(x,y) and is default
+#' @param return character, what to return ("x", "y", or "xy"). "xy" is default
 #'
-#' @return vector of centered x and y (i.e., (x,y))
+#' @return vector x, y, or c(x,y)
 #' @export
 #'
 CenterXYInCell <- function(x,
@@ -49,14 +49,14 @@ CenterXYInCell <- function(x,
                            xmin,
                            ymin,
                            cellsize,
-                           output = NA) {
+                           output = "xy") {
   x <- xmin + (floor(((x-xmin)/cellsize))*cellsize) + (cellsize/2)
   y <- ymin + (floor(((y-ymin)/cellsize))*cellsize) + (cellsize/2)
   if(output == 'x') {
     result <- x
   } else if(output == 'y'){
     result <- y
-  } else {
+  } else if(output == 'xy'){
     result <- c(x, y)
   }
   return(result)
@@ -214,14 +214,14 @@ CreateSimConNestDistRasters <- function(agents,
   raster_files <- vector()
   cellsize <- raster::res(base)[1]
   max_r_cells <- ceiling(max_r/cellsize)
-  xmin <- xmin(base)
-  ymin <- ymin(base)
-  for (i in 1:nrow(nest_set)){
-    nest_set[i, "x"] <- CenterXYInCell(nest_set[i, "long_utm"],
-      nest_set[i, "lat_utm"], xmin, ymin, cellsize)[1]
-    nest_set[i, "y"] <- CenterXYInCell(nest_set[i, "long_utm"],
-      nest_set[i, "lat_utm"], xmin, ymin, cellsize)[2]
-  }
+  xmin <- raster::xmin(base)
+  ymin <- raster::ymin(base)
+  cellsize <- raster::res(base)[1]
+  nest_set <- nest_set %>%
+    dplyr::mutate(x = CenterXYInCell(long_utm, lat_utm, xmin, ymin, cellsize,
+      "x")) %>%
+    dplyr::mutate(y = CenterXYInCell(long_utm, lat_utm, xmin, ymin, cellsize,
+       "y"))
   nest_set_sf <- sf::st_as_sf(x = nest_set, coords = c("x", "y"), crs = 32619)
   con_nest_list <- purrr::map(unique(input$nest_id), ~ NULL)
   names(con_nest_list) <- unique(input$nest_id)
@@ -235,7 +235,7 @@ CreateSimConNestDistRasters <- function(agents,
     home_i_y <- CenterXYInCell(nest_i_xy[1], nest_i_xy[2], xmin, ymin,
       cellsize)[[2]] # home nest lat
     home_i_xy <- tibble::tibble(x = home_i_x, y = home_i_y)
-    home_i_sf <- sf::st_as_sf(x = home_i_xy, coords = c("x", "y"), crs=32619)
+    home_i_sf <- sf::st_as_sf(x = home_i_xy, coords = c("x", "y"), crs = 32619)
     cell_extent <- raster::extent(home_i_x - (cellsize/2),
       home_i_x + (cellsize/2), home_i_y - (cellsize/2),
       home_i_y + (cellsize/2))
@@ -493,7 +493,7 @@ CreateMoveKernelWeibull <- function(max_r = 300,
 #' @export
 #'
 
-CreateMoveKernelWeibullVonMises <- function(max_r = 300,
+                                                                                                 CreateMoveKernelWeibullVonMises <- function(max_r = 300,
                                             cellsize = 30,
                                             pars = NULL,
                                             mu1,

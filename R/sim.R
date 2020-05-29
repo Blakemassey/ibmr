@@ -281,10 +281,11 @@ CreateBase <- function(x_min,
 #'
 CreateBirthDate <- function(input = sim$agents$input){
   # Only proceed if there is no birth_date column
-  if(is.null(input$birth_date)){
+  if(!"birth_date" %in% colnames(input)){
     # Loop through each row in the input
     input_age_period <- sim$pars$global$input_age_period
     birth_day <- sim$pars$global$birth_day
+    input <- tibble::add_column(input, birth_date = NA)
     for(a in 1:nrow(input)){
       # Is the age_period a year?
       if(input_age_period == "year" || input_age_period == "years") {
