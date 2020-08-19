@@ -17,10 +17,10 @@ CenterXYInCell(x, y, xmin, ymin, cellsize)
 
 \item{cellsize}{cell size in units of the x and y values}
 
-\item{return}{character, what to return (x, y, or NA). NA = c(x,y) and is default}
+\item{return}{character, what to return ("x", "y", or "xy"). "xy" is default}
 }
 \value{
-vector of centered x and y (i.e., (x,y))
+vector x, y, or c(x,y)
 }
 \description{
 Centers x and y values into the center of a raster cell based on the xmin,

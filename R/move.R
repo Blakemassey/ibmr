@@ -191,90 +191,7 @@ CreateConNestProb <- function(con_nest_raster,
 
 
 
-#' Create con_nest distance rasters for simulation
-#'
-#' @param agents list, agents
-#' @param nest_set dataframe, nests with coordinates
-#' @param base raster, the base raster layer for the analysis
-#' @param output_dir character, location for the output
-#' @param max_r numeric, maximum radius for kernels. Default = 30000
-#' @param write_con_nest_all logical, whether or not to write the
-#'
-#' @export
-#'
 
-CreateSimConNestDistRasters <- function(agents,
-                                       nest_set,
-                                       base = base,
-                                       output_dir = "Output/Sim/Territorial",
-                                       max_r = 30000,
-                                       write_con_nest_all = TRUE){
-  if (!dir.exists(output_dir)) dir.create(output_dir)
-  input <- agents %>% pluck("input")
-  raster_files <- vector()
-  cellsize <- raster::res(base)[1]
-  max_r_cells <- ceiling(max_r/cellsize)
-  xmin <- raster::xmin(base)
-  ymin <- raster::ymin(base)
-  cellsize <- raster::res(base)[1]
-  nest_set <- nest_set %>%
-    dplyr::mutate(x = CenterXYInCell(long_utm, lat_utm, xmin, ymin, cellsize,
-      "x")) %>%
-    dplyr::mutate(y = CenterXYInCell(long_utm, lat_utm, xmin, ymin, cellsize,
-       "y"))
-  nest_set_sf <- sf::st_as_sf(x = nest_set, coords = c("x", "y"), crs = 32619)
-  con_nest_list <- purrr::map(unique(input$nest_id), ~ NULL)
-  names(con_nest_list) <- unique(input$nest_id)
-  for (i in unique(input$nest_id)){
-    nest_i <- i %>% str_replace_all(., "nest_", "")
-    nest_set_i <- nest_set %>% slice(which(nest_set$nest_site == nest_i))
-    nest_i_xy <- nest_set_i %>% dplyr::slice(1) %>%
-      dplyr::select(long_utm, lat_utm) %>% as.vector()
-    home_i_x <- CenterXYInCell(nest_i_xy[1], nest_i_xy[2], xmin, ymin,
-      cellsize)[[1]] # home nest long
-    home_i_y <- CenterXYInCell(nest_i_xy[1], nest_i_xy[2], xmin, ymin,
-      cellsize)[[2]] # home nest lat
-    home_i_xy <- tibble::tibble(x = home_i_x, y = home_i_y)
-    home_i_sf <- sf::st_as_sf(x = home_i_xy, coords = c("x", "y"), crs = 32619)
-    cell_extent <- raster::extent(home_i_x - (cellsize/2),
-      home_i_x + (cellsize/2), home_i_y - (cellsize/2),
-      home_i_y + (cellsize/2))
-    cell <- raster::setValues(raster(cell_extent, crs = projection(base),
-      res = cellsize), 100)
-    home_ext <- raster::extend(cell, c(max_r_cells, max_r_cells), value = NA)
-    summary(home_ext)
-    home_dist <- raster::distance(home_ext)
-    home_dist[home_dist > max_r] <- NA
-    nest_set_sf_i <- nest_set_sf %>%
-      dplyr::filter(nest_site != nest_i) # conspecific nests
-    home_i_buff <- sf::st_buffer(home_i_sf, max_r)
-    nests_i <- sf::st_contains(home_i_buff, nest_set_sf_i)
-    nest_set_sf_k <- nest_set_sf_i %>% dplyr::slice(unlist(nests_i))
-    con_dist <- raster::distanceFromPoints(home_ext,
-      sf::st_coordinates(nest_set_sf_k)) # raster of nests
-    # Nearest neighbor nest distance at home nest
-    home_con_dist <- raster::extract(con_dist, home_i_xy)
-    con_dist_home <- raster::calc(con_dist, function(x){home_con_dist - x})
-    con_nest_k <- raster::overlay(home_dist, con_dist_home,
-      fun = function(x,y){round(x + y)})
-#    filename_k <- file.path(output_dir, paste0("ConNest_", i, ".tif"))
-#    raster::writeRaster(con_nest_k, filename = filename_k, format = "GTiff",
-#      overwrite = TRUE)
-#    writeLines(noquote(paste("Writing:", filename_k)))
-    con_nest_list[[which(names(con_nest_list) == i)]] <- con_nest_k
-#    raster_files <- append(raster_files, filename_k)
-  }
-#  con_nest <- list()
-  #for(i in 1:length(con_nest_list)){con_nest[[i]] <- raster(raster_files[i])}
-#  con_nest_all <- do.call(raster::merge, unlist(con_nest_list))
-#  filename <- "Output/Analysis/Territorial/ConNest_All.tif"
-#  if(isTRUE(write_con_nest_all)){
-#    raster::writeRaster(con_nest_all, filename = filename, format = "GTiff",
-#      overwrite = TRUE)
-#  }
-#  writeLines(noquote(paste("Writing:", filename)))
-  return(con_nest_list)
-}
 
 
 
@@ -493,7 +410,7 @@ CreateMoveKernelWeibull <- function(max_r = 300,
 #' @export
 #'
 
-                                                                                                 CreateMoveKernelWeibullVonMises <- function(max_r = 300,
+CreateMoveKernelWeibullVonMises <- function(max_r = 300,
                                             cellsize = 30,
                                             pars = NULL,
                                             mu1,
@@ -549,6 +466,91 @@ CreateMoveKernelWeibull <- function(max_r = 300,
   move_kernel <- move_kernel/sum(move_kernel)
   move_kernel[absolute_distance_matrix > (max_r)] <- NA  # only NA in last step
   return(move_kernel)
+}
+
+#' Create con_nest distance rasters for simulation
+#'
+#' @param agents list, agents
+#' @param nest_set dataframe, nests with coordinates
+#' @param base raster, the base raster layer for the analysis
+#' @param output_dir character, location for the output
+#' @param max_r numeric, maximum radius for kernels. Default = 30000
+#' @param write_con_nest_all logical, whether or not to write the
+#'
+#' @export
+#'
+
+CreateSimConNestDistRasters <- function(agents,
+                                       nest_set,
+                                       base = base,
+                                       output_dir = "Output/Sim/Territorial",
+                                       max_r = 30000,
+                                       write_con_nest_all = TRUE){
+  if (!dir.exists(output_dir)) dir.create(output_dir)
+  input <- agents %>% pluck("input")
+  raster_files <- vector()
+  cellsize <- raster::res(base)[1]
+  max_r_cells <- ceiling(max_r/cellsize)
+  xmin <- raster::xmin(base)
+  ymin <- raster::ymin(base)
+  cellsize <- raster::res(base)[1]
+  nest_set <- nest_set %>%
+    dplyr::mutate(x = CenterXYInCell(long_utm, lat_utm, xmin, ymin, cellsize,
+      "x")) %>%
+    dplyr::mutate(y = CenterXYInCell(long_utm, lat_utm, xmin, ymin, cellsize,
+       "y"))
+  nest_set_sf <- sf::st_as_sf(x = nest_set, coords = c("x", "y"), crs = 32619)
+  con_nest_list <- purrr::map(unique(input$nest_id), ~ NULL)
+  names(con_nest_list) <- unique(input$nest_id)
+  for (i in unique(input$nest_id)){
+    nest_i <- i %>% str_replace_all(., "nest_", "")
+    nest_set_i <- nest_set %>% slice(which(nest_set$nest_site == nest_i))
+    nest_i_xy <- nest_set_i %>% dplyr::slice(1) %>%
+      dplyr::select(long_utm, lat_utm) %>% as.vector()
+    home_i_x <- CenterXYInCell(nest_i_xy[1], nest_i_xy[2], xmin, ymin,
+      cellsize)[[1]] # home nest long
+    home_i_y <- CenterXYInCell(nest_i_xy[1], nest_i_xy[2], xmin, ymin,
+      cellsize)[[2]] # home nest lat
+    home_i_xy <- tibble::tibble(x = home_i_x, y = home_i_y)
+    home_i_sf <- sf::st_as_sf(x = home_i_xy, coords = c("x", "y"), crs = 32619)
+    cell_extent <- raster::extent(home_i_x - (cellsize/2),
+      home_i_x + (cellsize/2), home_i_y - (cellsize/2),
+      home_i_y + (cellsize/2))
+    cell <- raster::setValues(raster(cell_extent, crs = projection(base),
+      res = cellsize), 100)
+    home_ext <- raster::extend(cell, c(max_r_cells, max_r_cells), value = NA)
+    summary(home_ext)
+    home_dist <- raster::distance(home_ext)
+    home_dist[home_dist > max_r] <- NA
+    nest_set_sf_i <- nest_set_sf %>%
+      dplyr::filter(nest_site != nest_i) # conspecific nests
+    home_i_buff <- sf::st_buffer(home_i_sf, max_r)
+    nests_i <- sf::st_contains(home_i_buff, nest_set_sf_i)
+    nest_set_sf_k <- nest_set_sf_i %>% dplyr::slice(unlist(nests_i))
+    con_dist <- raster::distanceFromPoints(home_ext,
+      sf::st_coordinates(nest_set_sf_k)) # raster of nests
+    # Nearest neighbor nest distance at home nest
+    home_con_dist <- raster::extract(con_dist, home_i_xy)
+    con_dist_home <- raster::calc(con_dist, function(x){home_con_dist - x})
+    con_nest_k <- raster::overlay(home_dist, con_dist_home,
+      fun = function(x,y){round(x + y)})
+#    filename_k <- file.path(output_dir, paste0("ConNest_", i, ".tif"))
+#    raster::writeRaster(con_nest_k, filename = filename_k, format = "GTiff",
+#      overwrite = TRUE)
+#    writeLines(noquote(paste("Writing:", filename_k)))
+    con_nest_list[[which(names(con_nest_list) == i)]] <- con_nest_k
+#    raster_files <- append(raster_files, filename_k)
+  }
+#  con_nest <- list()
+  #for(i in 1:length(con_nest_list)){con_nest[[i]] <- raster(raster_files[i])}
+#  con_nest_all <- do.call(raster::merge, unlist(con_nest_list))
+#  filename <- "Output/Analysis/Territorial/ConNest_All.tif"
+#  if(isTRUE(write_con_nest_all)){
+#    raster::writeRaster(con_nest_all, filename = filename, format = "GTiff",
+#      overwrite = TRUE)
+#  }
+#  writeLines(noquote(paste("Writing:", filename)))
+  return(con_nest_list)
 }
 
 #' MovementSubModel
