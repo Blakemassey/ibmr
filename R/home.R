@@ -168,7 +168,7 @@ PlotSimHomeRange <- function (sim,
     homerange_df <- data.frame(rasterToPoints(homerange))
     colnames(homerange_df)[3] <- "Probability"
     if(is.null(col)) col <- jet2.col(length(unique(homerange)))
-    g <- ggplot(homerange_df, aes(x=x, y=y))+ geom_raster(aes(fill=Probability)                                          ,
+    g <- ggplot(homerange_df, aes(x=x, y=y))+ geom_raster(aes(fill=Probability),
       interpolate=TRUE) + scale_fill_gradientn(limits=c(0,1),colours=col)
   } else {
     g <- ggplot(data=sim) + theme(legend.position="none")
